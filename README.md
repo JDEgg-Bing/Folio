@@ -19,6 +19,8 @@
 
 <p align="center"><code>1.2.0 发布候选</code> &nbsp; <code>Windows 11 · x64 已验证</code> &nbsp; <a href="LICENSE">MIT</a></p>
 
+<p align="center"><a href="https://github.com/JDEgg-Bing/Folio/actions/workflows/ci.yml"><img src="https://github.com/JDEgg-Bing/Folio/actions/workflows/ci.yml/badge.svg?branch=main" alt="Windows 自动检查"></a></p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/writing-dark.png">
   <img src="docs/images/writing-light.png" alt="轻页实际写作界面：示例文稿中的标题、公式、表格和段落" width="1120">

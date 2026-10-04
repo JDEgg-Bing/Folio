@@ -19,6 +19,8 @@
 
 <p align="center"><code>1.2.0 release candidate</code> &nbsp; <code>Tested on Windows 11 · x64</code> &nbsp; <a href="LICENSE">MIT</a></p>
 
+<p align="center"><a href="https://github.com/JDEgg-Bing/Folio/actions/workflows/ci.yml"><img src="https://github.com/JDEgg-Bing/Folio/actions/workflows/ci.yml/badge.svg?branch=main" alt="Windows checks"></a></p>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/writing-dark.png">
   <img src="docs/images/writing-light.png" alt="The running Folio editor, with headings, equations, a table and paragraphs in the shared sample document" width="1120">
