@@ -48,7 +48,7 @@ All three screenshots show the running 1.2.0 application and the same [sample do
 
 ## Download and install
 
-**1.2.0 is a pre-release.** Visit [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0) and download `Folio-1.2.0 Setup.exe` and `SHA256SUMS.txt`. This version is intended for trials and feedback; see the verified scope and remaining limits below.
+**1.2.0 is a pre-release.** Visit [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0) and download `Folio-1.2.0.Setup.exe` and `SHA256SUMS.txt`. This version is intended for trials and feedback; see the verified scope and remaining limits below.
 
 1. Verify the checksum following the [installation guide](docs/INSTALLATION.md), then run the installer.
 2. Follow the Chinese wizard to choose an installation folder and optional desktop shortcut. The default is a per-user installation without administrator privileges.

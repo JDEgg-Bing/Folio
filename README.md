@@ -48,7 +48,7 @@
 
 ## 下载安装
 
-**当前为 1.2.0 预发布版。** 前往 [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0)，下载 `Folio-1.2.0 Setup.exe` 和 `SHA256SUMS.txt`。预发布版适合试用和反馈，已知验证范围见下文。
+**当前为 1.2.0 预发布版。** 前往 [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0)，下载 `Folio-1.2.0.Setup.exe` 和 `SHA256SUMS.txt`。预发布版适合试用和反馈，已知验证范围见下文。
 
 1. 按[安装指南](docs/INSTALLATION.md)核对校验值，再运行安装包。
 2. 跟随中文向导选择安装位置和可选的桌面快捷方式；默认按当前用户安装，无需管理员权限。
