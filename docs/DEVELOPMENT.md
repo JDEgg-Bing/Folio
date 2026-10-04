@@ -27,7 +27,7 @@ $env:FOLIO_ISCC = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 npm run release:installer
 ```
 
-也可将已验证编译器放在 `out/build-tools/inno/`。正式安装包输出 `out/make/folio.windows/x64/Folio-1.2.0 Setup.exe`；相邻 `.build.json` 绑定应用目录与安装包哈希。旧 Squirrel `npm run make` 仅保留兼容用途，当前正式入口为 `release:installer`。
+也可将已验证编译器放在 `out/build-tools/inno/`。正式安装包输出 `out/make/folio.windows/x64/Folio-1.2.0 Setup.exe`；相邻 `.build.json` 绑定应用目录与安装包哈希。发布资料生成时使用 GitHub 兼容的文件名 `Folio-1.2.0.Setup.exe`，文件内容保持一致。旧 Squirrel `npm run make` 仅保留兼容用途，当前正式入口为 `release:installer`。
 
 ## 桌面与安装验收
 

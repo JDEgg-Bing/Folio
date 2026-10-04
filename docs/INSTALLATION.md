@@ -2,12 +2,12 @@
 
 ## 获取安装包
 
-当前 1.2.0 是预发布版。从 [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0) 下载标为 Pre-release 的 `Folio-1.2.0 Setup.exe`，同时下载 `SHA256SUMS.txt` 和第三方声明压缩包。源码压缩包不是安装包。
+当前 1.2.0 是预发布版。从 [GitHub Releases](https://github.com/JDEgg-Bing/Folio/releases/tag/v1.2.0) 下载标为 Pre-release 的 `Folio-1.2.0.Setup.exe`，同时下载 `SHA256SUMS.txt` 和第三方声明压缩包。源码压缩包不是安装包。
 
 在下载目录用 PowerShell 核对 SHA-256：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath '.\Folio-1.2.0 Setup.exe'
+Get-FileHash -Algorithm SHA256 -LiteralPath '.\Folio-1.2.0.Setup.exe'
 ```
 
 与 `SHA256SUMS.txt` 对应行比较完整的 64 位结果。校验只能确认文件一致；安装包尚未代码签名，不能借此证明发布者身份。若系统显示安全提示，请先核对来源和文件。

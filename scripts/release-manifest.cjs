@@ -27,6 +27,7 @@ const lifecycleFile = argument('--lifecycle-results', path.join(root, 'out/journ
 const lifecycle = validateEvidence(JSON.parse(fs.readFileSync(lifecycleFile, 'utf8')), build, 'installer lifecycle');
 if (!['install', 'uninstall', 'reinstall', 'retainedDataRead'].every(key => lifecycle.checks?.[key] === true)) throw new Error('Incomplete installer lifecycle acceptance.');
 const installerName = `Folio-${pkg.version} Setup.exe`;
+const publishedInstallerName = `Folio-${pkg.version}.Setup.exe`;
 const installer = path.join(root, 'out/make/folio.windows/x64', installerName);
 const installerBytes = fs.readFileSync(installer);
 const sidecar = JSON.parse(fs.readFileSync(installer + '.build.json', 'utf8'));
@@ -38,7 +39,7 @@ const base = path.join(root, `out/releases/Folio-${pkg.version}-win32-x64`);
 const output = path.join(base, 'public'), diagnostics = path.join(base, 'private-diagnostics', `run-${Date.now()}`);
 // All gating happens above. Never export raw profiles, local paths or screenshots as release attachments.
 fs.mkdirSync(output, { recursive: true }); fs.mkdirSync(diagnostics, { recursive: true });
-fs.copyFileSync(installer, path.join(output, installerName));
+fs.copyFileSync(installer, path.join(output, publishedInstallerName));
 for (const [name, source] of [['desktop-results.json', desktop.file], ['word-template-results.json', word.file], ['lifecycle-results.json', lifecycleFile]]) fs.copyFileSync(source, path.join(diagnostics, name));
 const resources = path.join(application, 'resources/release-resources');
 const zipped = {};
@@ -53,7 +54,7 @@ const materialName = `Folio-${pkg.version}-notices.zip`, materialBytes = require
 fs.writeFileSync(path.join(output, materialName), materialBytes);
 fs.copyFileSync(path.join(resources, 'LICENSE'), path.join(output, 'LICENSE'));
 fs.copyFileSync(path.join(resources, 'RELEASE_NOTES.md'), path.join(output, 'RELEASE_NOTES.md'));
-const artifacts = [{ name: installerName, bytes: installerBytes.length, sha256: installerSha256 }, { name: materialName, bytes: materialBytes.length, sha256: sha256(materialBytes) }];
+const artifacts = [{ name: publishedInstallerName, bytes: installerBytes.length, sha256: installerSha256 }, { name: materialName, bytes: materialBytes.length, sha256: sha256(materialBytes) }];
 for (const name of ['LICENSE', 'RELEASE_NOTES.md']) { const bytes = fs.readFileSync(path.join(output, name)); artifacts.push({ name, bytes: bytes.length, sha256: sha256(bytes) }); }
 fs.writeFileSync(path.join(output, 'SHA256SUMS.txt'), artifacts.map(item => `${item.sha256}  ${item.name}`).join('\n') + '\n');
 fs.writeFileSync(path.join(output, 'manifest.json'), JSON.stringify({ product: 'Folio · 轻页', version: pkg.version, status: 'release-candidate', platform: 'win32-x64', signature: 'NotSigned', build, artifacts, acceptance: { desktop: 'PASS', word: 'PASS', installerLifecycle: 'PASS', installerLifecycleScope: lifecycle.scope, upgrade: lifecycle.upgrade, desktopLimits: desktop.report.limits } }, null, 2));
