@@ -1,0 +1,24 @@
+.cm-preview-strike { text-decoration: line-through; }
+.cm-formatting { color: var(--text-muted); }
+
+/* Keep the writing canvas free of interface fonts and decorative containers. */
+.editor-region .cm-content { font-kerning: normal; }
+.editor-region .cm-content ::selection { background: var(--selection); }
+.editor-region .cm-cursor, .editor-region .cm-dropCursor { border-left-color: var(--accent); }
+.editor-region .cm-selectionBackground { background: var(--selection); }
+.editor-region .cm-panels { background: var(--surface); color: var(--text-secondary); font: 12px/1.5 var(--ui-font-family); }
+.editor-region .cm-panels-bottom { border-top: 1px solid var(--border); }
+.editor-region .cm-search { padding: 10px 36px 10px 20px; }
+.editor-region .cm-search input, .editor-region .cm-search button { font: 12px/1.5 var(--ui-font-family); }
+.editor-region .cm-search .cm-textfield { height: 28px; max-width: 100%; padding: 3px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); }
+.editor-region .cm-search .cm-textfield::placeholder { color: var(--text-muted); }
+.editor-region .cm-search .cm-button { min-height: 28px; margin-left: 4px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); text-transform: none; box-shadow: none; cursor: pointer; }
+.editor-region .cm-search .cm-button:hover { background: var(--hover); border-color: var(--text-muted); }
+.editor-region .cm-search .cm-button:active { background: var(--active); }
+.editor-region .cm-search label { display: inline-flex; align-items: center; gap: 3px; margin-left: 7px; white-space: nowrap; }
+.editor-region .cm-search input[type=checkbox] { margin: 0; accent-color: var(--accent); }
+.editor-region .cm-search [name=close] { top: 9px; right: 8px; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.editor-region .cm-search [name=close]:hover { background: var(--hover); color: var(--text); }
+.editor-region .cm-searchMatch { background: var(--accent-soft-hover); }
+.editor-region .cm-searchMatch-selected { background: var(--selection); outline: 1px solid var(--accent); }
+.editor-region .cm-tooltip { padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow); font: 12px/1.5 var(--ui-font-family); }

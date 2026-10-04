@@ -1,0 +1,17 @@
+node_modules/
+out/
+.webpack/
+coverage/
+dist/
+
+# Private local drafts and historical audit archives; preserve them on disk.
+/MarkdownEditor_V1_Audit.zip
+/manual-tests/Untitled.md
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+Thumbs.db
+.DS_Store

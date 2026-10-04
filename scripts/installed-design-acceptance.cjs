@@ -1,0 +1,64 @@
+// Read retained data through the actual reinstalled executable; test only the isolated profile.
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict'), crypto = require('node:crypto');
+const { _electron } = require(process.env.MARKDOWN_PLAYWRIGHT_MODULE || 'playwright');
+const root = path.resolve(__dirname, '..'), output = path.join(root, 'out/journey-design');
+const profile = path.join(output, 'installed-profile'), executablePath = path.join(output, 'installed/Folio.exe');
+const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const recovery = path.join(profile, 'recovery/draft.json'), previousHash = hash(recovery);
+let app;
+(async () => {
+  const checks = [];
+  try {
+    app = await _electron.launch({ executablePath, args: [`--user-data-dir=${profile}`] });
+    const page = await app.firstWindow(); await page.locator('.recovery-dialog').waitFor();
+    const info = await page.evaluate(() => window.desktopAPI.getAppInfo());
+    assert.equal(info.version, '1.2.0'); assert.equal(path.resolve(info.dataPath), profile);
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), '恢复文稿');
+    await page.screenshot({ path: path.join(output, '09-reinstalled-recovery.png') });
+    await page.getByRole('button', { name: '丢弃恢复草稿', exact: true }).click();
+    await page.getByRole('button', { name: '确认丢弃草稿', exact: true }).waitFor();
+    await page.screenshot({ path: path.join(output, '10-recovery-discard-confirm.png') });
+    assert.equal(hash(recovery), previousHash);
+    await page.keyboard.press('Escape'); assert.equal(await page.locator('.recovery-dialog[open]').count(), 1);
+    assert.equal(hash(recovery), previousHash);
+    await page.getByRole('button', { name: '恢复文稿', exact: true }).click();
+    await page.locator('.recovery-dialog').waitFor({ state: 'detached' });
+    assert.ok((await page.locator('.cm-content').innerText()).includes('重装后恢复的文稿'));
+    assert.ok((await page.locator('.status-document').innerText()).includes('已修改'));
+    checks.push('Reinstalled 1.2.0 reads preserved recovery; restore focus, discard requires a second decision, Escape preserves, restore remains dirty');
+    const library = await page.evaluate(() => window.desktopAPI.wordTemplates.list());
+    assert.equal(library.templates.length, 3);
+    const expected = JSON.parse(fs.readFileSync(path.join(profile, 'word-templates/default.json'), 'utf8')).id;
+    assert.equal(library.defaultId, expected);
+    const preferences = await page.evaluate(() => localStorage.getItem('markdown-editor.preferences.v1'));
+    fs.writeFileSync(path.join(output, 'reinstalled-preferences.json'), JSON.stringify({preferences}, null, 2));
+    assert.ok(preferences?.includes('Folio Missing Font 123456'));
+    const command = id => app.evaluate(({ BrowserWindow }, id) => BrowserWindow.getAllWindows().find(w => w.isVisible()).webContents.send('app:command', id), id);
+    await command('appearance'); await page.locator('.appearance-dialog').waitFor();
+    assert.equal(await page.getByLabel('中文字体', { exact: true }).inputValue(), 'Folio Missing Font 123456');
+    await page.screenshot({ path: path.join(output, '11-reinstalled-preferences.png') });
+    await page.keyboard.press('Escape');
+    await command('word-templates'); await page.locator('.word-template-dialog').waitFor();
+    await page.getByRole('combobox', { name: '选择模板', exact: true }).selectOption(expected);
+    await page.getByRole('button', { name: '删除模板', exact: true }).click();
+    await page.locator('.decision-dialog').waitFor();
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), '取消');
+    await page.screenshot({ path: path.join(output, '12-template-delete-confirm.png') });
+    await page.keyboard.press('Escape'); await page.locator('.decision-dialog').waitFor({ state: 'detached' });
+    assert.equal((await page.evaluate(() => window.desktopAPI.wordTemplates.list())).templates.length, 3);
+    assert.ok(await page.getByRole('button', { name: '删除模板', exact: true }).evaluate(el => el === document.activeElement));
+    await page.getByRole('button', { name: '删除模板', exact: true }).click();
+    await page.locator('.decision-dialog').getByRole('button', { name: '删除模板', exact: true }).click();
+    await page.waitForFunction(async () => (await window.desktopAPI.wordTemplates.list()).templates.length === 2);
+    checks.push('Preserved appearance, all three templates and default selection load; delete defaults to cancel, Escape restores focus, explicit deletion succeeds');
+    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await app.evaluate(({ dialog }) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: process.argv.find(x => x.startsWith('--user-data-dir=')).slice(16) + '/recovered.md' }); });
+    await command('save'); await page.waitForFunction(() => document.querySelector('.status-document').textContent.includes('已保存'));
+    await app.close(); app = null;
+    fs.writeFileSync(path.join(output, 'installed-app-results.json'), JSON.stringify({ result: 'PASS', executablePath, profile, checks }, null, 2));
+    console.log(JSON.stringify({ result: 'PASS', checks }));
+  } catch (error) {
+    fs.writeFileSync(path.join(output, 'installed-app-results.json'), JSON.stringify({ result: 'FAIL', error: String(error), checks }, null, 2));
+    console.error(error); if (app) await app.evaluate(({ app }) => app.exit()).catch(() => {}); process.exitCode = 1;
+  }
+})();

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">
+  <rect x="10" y="10" width="460" height="140" fill="#fafafa" stroke="#555"/>
+  <path d="M50 110L150 50L250 100L420 30" fill="none" stroke="#333" stroke-width="2"/>
+  <text x="50" y="140" font-family="Times New Roman" font-size="16">Compression response</text>
+</svg>

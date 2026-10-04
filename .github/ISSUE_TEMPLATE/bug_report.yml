@@ -1,0 +1,41 @@
+name: 错误报告 / Bug report
+description: 描述可复现的问题 / Report a reproducible problem
+body:
+  - type: markdown
+    attributes:
+      value: 请先查看已知限制；安全漏洞按 SECURITY.md 私密报告。不要附私人文稿或未脱敏日志。 / Check known limits. Report security issues privately; remove private data.
+  - type: input
+    id: version
+    attributes:
+      label: Folio 版本 / Version
+      description: 帮助 → 关于轻页 / Help → About
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows 版本与架构 / Windows version and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果 / Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果 / Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏示例与截图 / Anonymized example or screenshot

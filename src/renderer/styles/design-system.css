@@ -1,0 +1,64 @@
+/* Folio interaction primitives. Application controls share this layer. */
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px;
+  --control-height: 36px; --dialog-radius: 12px;
+  --danger-text: #a02e2e; --danger-bg: #fcecec; --danger-border: #d5a6a6;
+  --success-text: #346451; --success-bg: #edf4ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --danger-text: #f2aaaa; --danger-bg: #402d2e; --danger-border: #795051; --success-text: #b6d5c1; --success-bg: #283b30; }
+}
+.appearance-dialog { border-radius: var(--dialog-radius); }
+.appearance-header { padding: 20px var(--space-6); }
+.appearance-header h1 { font-size: 18px; line-height: 1.4; letter-spacing: 0; }
+.appearance-header p { font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+.appearance-body { padding: var(--space-4) var(--space-6); }
+.appearance-body > p { line-height: 1.7; }
+.dialog-actions, .appearance-actions, .template-footer { display: flex; align-items: center; flex-shrink: 0; gap: var(--space-2); padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border); background: var(--surface); }
+.dialog-actions { justify-content: flex-end; flex-wrap: wrap; }
+.app-shell :is(.folio-button, .help-button, .template-toolbar button, .template-mapping button, .template-chooser button, .template-uncertain button, .inline-progress button) {
+  min-height: var(--control-height); padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-raised); color: var(--text); font: 500 13px/1.5 var(--ui-font-family); cursor: pointer; text-align: center;
+}
+.app-shell :is(.folio-button, .help-button, .template-toolbar button, .template-mapping button, .template-chooser button, .template-uncertain button):hover { background: var(--hover); border-color: var(--accent-border); }
+.app-shell .folio-button:active { background: var(--active); }
+.app-shell .folio-button.primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 600; }
+.app-shell .folio-button.primary:hover { background: var(--accent-hover); }
+.app-shell .folio-button.primary:active { background: var(--accent-active); }
+.app-shell .folio-button.danger { background: var(--surface-raised); color: var(--danger-text); border-color: var(--danger-border); }
+.app-shell .folio-button.danger:hover { background: var(--danger-bg); }
+.app-shell button:disabled { opacity: .5; cursor: default; }
+.app-shell button:disabled:hover { border-color: var(--border); }
+.appearance-field :is(input:not([type=checkbox]), select), .template-toolbar select, .template-mapping select, .template-chooser input { min-height: var(--control-height); padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); font: inherit; }
+.app-shell input[type=checkbox], .app-shell input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; }
+.appearance-error, .template-warnings { border: 1px solid var(--warning-border); border-radius: var(--radius); background: var(--warning-bg); color: var(--warning-text); padding: 12px; overflow-wrap: anywhere; }
+.template-warnings h2 { color: var(--warning-text); }
+.template-summary { background: var(--surface); border-radius: var(--radius); }
+.template-footer { justify-content: flex-end; }
+.template-footer > .danger { margin-right: auto; }
+.template-toolbar { gap: var(--space-2); }
+.inline-progress { padding: 12px; border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); }
+.dialog-eyebrow { margin: 0 0 8px !important; font-size: 12px !important; color: var(--accent) !important; }
+.decision-dialog { width: min(520px, calc(100vw - 32px)); }
+.decision-options { display: grid; gap: var(--space-2); }
+.decision-option { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); cursor: pointer; }
+.decision-option:hover { border-color: var(--accent-border); background: var(--hover); }
+.decision-option[data-selected=true] { border-color: var(--accent); background: var(--accent-soft); }
+.decision-option input { margin: 3px 0 0; flex-shrink: 0; }
+.decision-option strong { display: block; font-weight: 600; }
+.decision-option small { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.welcome-mark { float: left; width: 48px; height: 48px; margin-right: 16px; border-radius: 10px; }
+.help-dialog:has(.welcome-mark) { max-height: calc(100vh - 32px); }
+.welcome-intro { margin-top: 0; font-size: 14px; }
+.welcome-steps { margin: 20px 0; padding-left: 24px; color: var(--accent); }
+.welcome-steps li { padding-left: 8px; margin: 16px 0; }
+.welcome-steps strong { display: block; color: var(--text); font-weight: 600; }
+.welcome-steps span { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+.help-shortcuts dd { font-size: 12px; border-radius: 4px; padding: 1px 6px; background: var(--surface); }
+.help-shortcuts > div { padding: 3px 0; }
+.help-path { overflow-wrap: anywhere; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.export-notice { background: var(--success-bg); color: var(--success-text); }
+.export-notice[aria-busy=true] { background: var(--surface); color: var(--text-secondary); }
+.export-notice[aria-busy=true] > button { visibility: hidden; }
+@media(max-width: 680px) { .template-footer > .danger { margin-right: 0; } .appearance-field { flex-wrap: wrap; } }
+@media(forced-colors: active) { .decision-option[data-selected=true], .app-shell .folio-button { border-color: ButtonText; } }

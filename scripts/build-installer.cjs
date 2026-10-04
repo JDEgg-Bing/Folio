@@ -1,0 +1,15 @@
+const fs = require('node:fs'), path = require('node:path'), { execFileSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..'), pkg = require('../package.json');
+const { buildIdentity, sha256 } = require('./release-evidence.cjs');
+const compiler = process.env.FOLIO_ISCC || path.join(root, 'out/build-tools/inno/ISCC.exe');
+if (!fs.existsSync(compiler)) throw new Error('请配置 FOLIO_ISCC 为 Inno Setup 6.7.3 的 ISCC.exe 路径。安装工具来源及版本见 docs/DESIGN_SYSTEM.md。');
+if (!fs.existsSync(path.join(root, 'out/Folio-win32-x64/Folio.exe'))) throw new Error('请先打包应用。');
+const test = process.argv.includes('--test');
+const at = process.argv.indexOf('--application-dir');
+const appDir = at < 0 ? path.join(root,'out/Folio-win32-x64') : path.resolve(process.argv[at+1]);
+if (!test && at >= 0) throw new Error('替代程序目录仅用于隔离版本升级验收。');
+const built = JSON.parse(require('@electron/asar').extractFile(path.join(appDir,'resources/app.asar'),'package.json').toString());
+if (!test && built.version !== pkg.version) throw new Error('请先打包当前版本。');
+execFileSync(compiler, [`/DAppVersion=${built.version}`, `/DRepoRoot=${root}`, `/DApplicationDir=${appDir}`, ...(test ? ['/DTestMode'] : []), path.join(root, 'assets/installer/Folio.iss')], { cwd:root, stdio:'inherit', windowsHide:true });
+const installer = test ? path.join(root, 'out/journey-design/installer', `Folio-${built.version}-Acceptance-Setup.exe`) : path.join(root, 'out/make/folio.windows/x64', `Folio-${built.version} Setup.exe`);
+fs.writeFileSync(installer + '.build.json', JSON.stringify({ build: buildIdentity(appDir), installerSha256: sha256(fs.readFileSync(installer)), testMode: test }, null, 2));

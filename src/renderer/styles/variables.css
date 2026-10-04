@@ -1,0 +1,53 @@
+:root {
+  color-scheme: light;
+  --ui-font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --bg: #faf9f6;
+  --surface: #f2f2ee;
+  --surface-raised: #fffefa;
+  --text: #30332f;
+  --text-secondary: #626860;
+  --text-muted: #71776f;
+  --border: #e2e4dc;
+  --accent: var(--accent-light, #466e60);
+  --accent-contrast: #ffffff;
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--text));
+  --accent-active: color-mix(in srgb, var(--accent) 76%, var(--text));
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --accent-soft-hover: color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 24%, transparent);
+  --accent-focus: var(--accent);
+  --hover: color-mix(in srgb, var(--accent) 6%, transparent);
+  --active: color-mix(in srgb, var(--accent) 16%, transparent);
+  --selection: color-mix(in srgb, var(--accent) 20%, transparent);
+  --brand-paper: var(--bg);
+  --titlebar-height: 44px;
+  --titlebar-glass: color-mix(in srgb, var(--bg) 78%, transparent);
+  --warning-bg: #f9f1df;
+  --warning-text: #76521b;
+  --warning-border: #e7d7b6;
+  --backdrop: rgb(24 29 25 / 30%);
+  --shadow: 0 16px 48px rgb(25 32 27 / 15%), 0 2px 8px rgb(25 32 27 / 6%);
+  --radius: 7px;
+  --motion: 140ms ease;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #232625;
+    --surface: #292d2b;
+    --surface-raised: #2d312f;
+    --text: #dedfd9;
+    --text-secondary: #b1b8af;
+    --text-muted: #9ca69b;
+    --border: #393f3a;
+    --accent: var(--accent-dark, #a5c7b5);
+    --accent-contrast: #232625;
+    --selection: color-mix(in srgb, var(--accent) 23%, transparent);
+    --titlebar-glass: color-mix(in srgb, var(--bg) 82%, transparent);
+    --warning-bg: #373125;
+    --warning-text: #e4c690;
+    --warning-border: #584a32;
+    --backdrop: rgb(10 14 11 / 48%);
+    --shadow: 0 16px 48px rgb(0 0 0 / 30%), 0 2px 8px rgb(0 0 0 / 15%);
+  }
+}

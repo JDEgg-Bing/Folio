@@ -1,0 +1,20 @@
+{
+  "mathml2omml": {
+    "version": "0.5.0",
+    "commit": "0ddeb8b59ff1a97796b25d8f682dfb410febde1d",
+    "url": "https://codeload.github.com/fiduswriter/mathml2omml/tar.gz/0ddeb8b59ff1a97796b25d8f682dfb410febde1d",
+    "sha256": "7c0578339e8af7ef06553a9cc0e5b7500b52905f36d2a8435e34c3c6f9f4b8e9",
+    "identitySource": "https://registry.npmjs.org/mathml2omml/0.5.0"
+  },
+  "entities": {
+    "version": "6.0.0",
+    "license": "MIT",
+    "url": "https://registry.npmjs.org/entities/6.0.0"
+  },
+  "innoSetup": {
+    "version": "6.7.3",
+    "sha256": "9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732",
+    "publisher": "Pyrsys B.V.",
+    "source": "https://jrsoftware.org/isdl.php"
+  }
+}

@@ -1,0 +1,19 @@
+name: 功能建议 / Feature request
+description: 说明写作场景与困难 / Describe your writing task and difficulty
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: 你想完成什么 / What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: difficulty
+    attributes:
+      label: 当前的困难与替代方式 / Current difficulty and workaround
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的体验 / Suggested experience
