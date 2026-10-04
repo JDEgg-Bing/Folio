@@ -1,0 +1,9 @@
+# Keep source and Markdown fixture positions consistent across Windows checkouts.
+* text=auto eol=lf
+*.png binary
+*.bmp binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.docx binary
+*.dotx binary
