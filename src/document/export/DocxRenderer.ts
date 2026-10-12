@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { imageParagraphParts } from '../imageLayout';
 import { mml2omml } from 'mathml2omml';
 import { zipSync, strToU8 } from 'fflate';
 import { imageSize } from 'image-size';
@@ -66,12 +67,12 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
     const rid = rel('image', `media/image${id}.${ext}`);
     return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="图片 ${id}" descr="${x(alt)}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="image${id}.${ext}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   }
-  async function image(n: DocumentNode, block: boolean) {
+  async function image(n: DocumentNode, block: boolean, contextProps = '') {
     let content: string;
     try { const resource = await request.resources.read(n.destination ?? '', signal); content = await drawing(resource.bytes, resource.mime, n.text ?? '', !block); }
     catch { signal.throwIfAborted(); diagnostics.push(`图片不可用：${n.text || n.destination}`); content = run(`[图片不可用：${n.text || n.destination}]`); }
     const hasCaption = [label(n), n.text].some(Boolean);
-    return block ? bookmarked(n, p(content, `<w:jc w:val="center"/><w:keepLines/>${hasCaption ? '<w:keepNext/>' : ''}<w:spacing w:before="${gap}" w:after="${hasCaption ? 0 : gap}"/>`) + (hasCaption ? caption([label(n), n.text].filter(Boolean).join('　')) : '')) : content;
+    return block ? bookmarked(n, p(content, contextProps.replace(/<w:spacing\b[^>]*\/>/g, '') + `<w:jc w:val="center"/><w:keepLines/>${hasCaption ? '<w:keepNext/>' : ''}<w:spacing w:before="${gap}" w:after="${hasCaption ? 0 : gap}"/>`) + (hasCaption ? caption([label(n), n.text].filter(Boolean).join('　')) : '')) : content;
   }
   async function math(n: DocumentNode) {
     const latex = n.text ?? '';
@@ -131,6 +132,8 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
       case 'raw': return n.sourceType === 'LinkReference' ? '' : p(await inline(n), contextProps);
       case 'heading': return p(await inline(n), `<w:pStyle w:val="${n === titleNode ? 'Title' : `Heading${n.level ?? 1}`}"/>`);
       case 'paragraph': {
+        const parts = imageParagraphParts(n);
+        if (parts) { let out = ''; for (const [index, part] of parts.entries()) out += await blocks(part, { ...ctx, first: ctx.first && index === 0 }); return out; }
         const fig = n.children.find(c => c.kind === 'image');
         if (n.checked === undefined && fig && n.children.every(c => c === fig || c.kind === 'attribute' || c.kind === 'text' && !c.text?.trim())) return image(fig, true);
         const mathOnly = n.children.every(c => c.kind === 'math' || c.kind === 'attribute' || c.kind === 'text' && !c.text?.trim());
@@ -148,7 +151,7 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
       case 'code': { const raw = n.text ?? ''; const text = /^\s*(`{3,}|~{3,})/.test(raw) ? raw.replace(/^\s*(`{3,}|~{3,})[^\n]*\n?/, '').replace(/\n?\s*(`{3,}|~{3,})\s*$/, '') : raw.replace(/^ {4}/gm, ''); return p(run(text), contextProps.replace('<w:pStyle w:val="Quote"/>', '') + '<w:pStyle w:val="CodeBlock"/><w:jc w:val="left"/>'); }
       case 'rule': return p('', '<w:pBdr><w:bottom w:val="single" w:sz="4" w:color="BBBBBB"/></w:pBdr>');
       case 'math': return math(n);
-      case 'image': return image(n, true);
+      case 'image': return image(n, true, contextProps);
       case 'table': {
         const rows = n.children.filter(c => c.kind === 'row'), columns = Math.max(1, ...rows.map(row => row.children.filter(c => c.kind === 'cell').length));
         const layout = manuscriptTableLayout(n, a), tableStyle = a.table;

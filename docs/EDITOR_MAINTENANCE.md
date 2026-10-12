@@ -1,5 +1,59 @@
 # Markdown 编辑器维护记录
 
+## 1.2.2 图片与光标交互
+
+日期：2026-10-12。保持现有 Lezer → DocumentModel → CodeMirror decorations 和独立导出架构。
+
+问题定位与修复：
+
+- 图片替换范围扩大到整个段落，且仅“独占段落”才能成为大图。改为语义层记录 `imageLayout`，独占源码一行即可成为图块；decoration 只覆盖图片源码，PDF／DOCX 通过共享分段函数依次输出相邻正文与图片。
+- 图块上下外边距和裁剪按钮附加行干扰邻近正文。移除外边距，按钮定位在图片容器内；小图为控件保留容器尺寸，避免溢出到相邻文字。
+- 图片加载后，即使 `requestMeasure` 已执行，编辑区的最小高度可能使外框尺寸不变，内部 height map 仍保存占位图高度。局部 ResizeObserver 通过测量请求和 StateEffect 更新 widget 的 `estimatedHeight`，修复加载后点击落在段尾的问题；保留已测量占位高度避免重新创建图片时闪缩。
+- 键盘选区变化会恢复标记、增高空行并展开图片，视觉行导航使用了变化的布局。对原生上下移动／Shift 扩选事务加展示注解，保留预览选区；隐藏图片范围提供原生 atomic ranges，仍由 CodeMirror 计算视觉行和目标横坐标。
+- 插图原来强制补两个换行，粘贴无入口。改为只补必要换行、连续图片单换行分隔；增加正文范围内的图片粘贴事件，复用图片票据、assets 导入和文档身份检查。支持原生文件、像素及 Windows STA 文件列表回退；普通文本、Markdown、网址保持原生粘贴。
+- 异步粘贴书签记录粘贴时选区，映射无关编辑；选区内容被编辑则作废。取消保存、失败、切换文稿不会修改正文；成功是独立的单步撤销事务。
+
+修改文件与职责：
+
+| 文件 | 作用 |
+| --- | --- |
+| `src/document/model.ts` | 图片布局语义标记 |
+| `src/document/DocumentStructureService.ts` | 独占源码行判断，包含缩进列表和引用 |
+| `src/document/imageLayout.ts` | 导出共享段落分段，保持原语义树和源码 |
+| `src/document/export/PdfRenderer.ts` | 按正文／图块顺序导出完整图片 |
+| `src/document/export/DocxRenderer.ts` | 同一布局和尺寸判断，保留列表图片的编号上下文 |
+| `src/renderer/editor/extensions/documentPreview.ts` | 精确替换范围、局部高度同步、图片点击与 atomic ranges |
+| `src/renderer/styles/app.css` | 无上下外边距图块、容器内裁剪控件 |
+| `src/renderer/editor/previewSelection.ts` | 原生垂直导航事务的展示注解 |
+| `src/renderer/editor/createEditorState.ts` | 上下方向键及 Shift 的原生命令接入 |
+| `src/renderer/editor/imageInsertion.ts` | 映射选区、最小换行、独立撤销事务 |
+| `src/renderer/editor/EditorController.ts` | 粘贴选区书签入口 |
+| `src/preload/preload.ts` | 正文局部 paste 事件和图片文件／像素快照 |
+| `src/shared/desktopApi.ts` | 平台图片粘贴事件合同 |
+| `src/renderer/platform/PlatformService.ts` | 平台接口 |
+| `src/renderer/platform/ElectronPlatformService.ts` | Electron 事件转发 |
+| `src/renderer/app/App.tsx` | 粘贴会话复用导入流程与文档身份检查 |
+| `src/main/assets/clipboardImages.ts` | 隐藏 Windows STA 文件列表读取与像素回退 |
+| `src/main/assets/registerAssets.ts` | 来源受限的图片字节／剪贴板 IPC |
+| `src/main/assets/ImageAssetService.ts` | 与文件相同的格式、50 MiB、30 张及票据校验 |
+| `tests/editor/imageEditing.test.ts` | 图文相邻、源码范围、导航展示、选区映射与撤销 |
+| `tests/editor/imageInsertion.test.ts` | 最小换行与已有空行回归 |
+| `tests/document/imageLayoutExport.test.ts` | PDF／DOCX 顺序、图片尺寸和列表编号 |
+| `tests/files/imageAssets.test.ts` | 剪贴板字节导入和校验 |
+| `scripts/editor-interaction-acceptance.cjs` | 真实鼠标、复制、加载／缩放／滚动、重复方向键验收 |
+| `scripts/image-paste-acceptance.cjs` | 系统像素／文件列表、键盘／菜单、失败／取消／文稿切换验收 |
+| `scripts/image-import-acceptance.cjs` | 拖入、菜单、重开及实际导出回归；显式点击正文避免误触裁剪 |
+| `src/renderer/ui/HelpDialog.tsx`、`docs/USER_GUIDE.md` | 应用内外使用指南 |
+| `package.json`、`package-lock.json`、`CHANGELOG.md`、`docs/CURRENT_STATE.md`、本文件 | 版本及维护记录 |
+
+验证：459 项测试、TypeScript 和 OSS 检查通过。真实 Electron 编辑交互 14 项、打包版粘贴 12 项、拖入／菜单导入 9 项、裁剪 12 项通过。包括图片加载前后、80%／125% 缩放与滚动、相邻正文输入、正反拖选／双击／Ctrl+C、长行折行、粗体、嵌套任务／无序列表、连续上下移动与 Shift 扩选、文稿首尾、截图、Chromium Copy Image、Explorer 兼容 CF_HDROP 单／多文件、STA 回退、普通文本、导入失败、取消保存和异步切换文稿、保存重开、另存为及实际 PDF／DOCX。
+
+桌面脚本使用隔离文稿和独立 user-data-dir。截图写入原生系统剪贴板；文件列表通过 Windows Forms 写入真实 CF_HDROP，使用 Electron／Chromium 原生键盘、鼠标与菜单输入。文件对话框结果和延迟失败场景由测试控制；这不等于人工操作物理鼠标、截图快捷键或资源管理器界面。证据保存在忽略目录 `out/editor-interaction/`、`out/image-paste/`、`out/image-import/`、`out/image-crop/`。
+
+没有增加全局鼠标选择监听器，也未修改浏览器默认 Selection。表格／公式内部逐字映射仍沿用先点击进入源码的边界，未擅自重构编辑器。
+
+以下保留历史版本记录。
+
 ## 1.2.1 图片裁剪补充
 
 问题定位：1.2.0 仅实现图片插入、资源解析和预览，未实现图片裁剪；不是用户文稿损坏或设置丢失。新增功能继续使用 CodeMirror 源文、PlatformService、受限 IPC 和 ImageAssetService，不更换解析或资源架构。

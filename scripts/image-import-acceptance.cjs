@@ -76,7 +76,7 @@ async function exportFile(format, text) {
     await page.mouse.dblclick(textPoints[0].x + 10, textPoints[0].y); await page.keyboard.press('Control+c');
     assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), 'bravo');
     checks.push('Packaged canvas drag, native double-click and Ctrl+C preserve exact text');
-    await page.locator('.cm-content').click(); await page.keyboard.press('Control+End');
+    await page.locator('.cm-line').filter({ hasText: /^end$/ }).click(); await page.keyboard.press('Control+End');
     await picker([chosen]);
     await page.getByRole('menuitem', { name: '编辑', exact: true }).click();
     await page.getByRole('menuitem', { name: '插入图片…', exact: true }).click();
@@ -90,7 +90,7 @@ async function exportFile(format, text) {
     assert.ok((await page.locator('.status-document').innerText()).includes('已保存'));
     assert.equal(fs.readFileSync(file, 'utf8'), saved);
     checks.push('Canceled image picker leaves source and attachments unchanged');
-    await page.locator('.cm-content').click(); await page.keyboard.press('Control+End');
+    await page.locator('.cm-line').filter({ hasText: /^end$/ }).click(); await page.keyboard.press('Control+End');
     const cdp = await page.context().newCDPSession(page);
     const box = await page.locator('.cm-line').last().boundingBox();
     for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, x: box.x + 10, y: box.y + box.height / 2, data: { items: [], files: [dropped, other], dragOperationsMask: 1 } });

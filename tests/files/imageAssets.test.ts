@@ -13,6 +13,20 @@ async function fixture() {
 }
 afterEach(async () => { for (const folder of folders.splice(0)) { if (!resolve(folder).startsWith(resolve(tmpdir()))) throw new Error('Unsafe test cleanup'); await rm(folder, { recursive: true, force: true }); } });
 describe('image resources and document attachments', () => {
+  it('imports clipboard pixels through tickets and the existing managed asset manifest', async () => {
+    const f = await fixture();
+    const ids = await f.service.stageBytes([{ bytes: png, mime: 'image/png', name: 'Screenshot.png' }]);
+    const [image] = await f.service.import(f.document, ids);
+    expect(image.destination).toMatch(/^assets\/[a-f0-9]+\.png$/); expect(await readFile(join(f.folder, image.destination))).toEqual(png);
+    expect(JSON.parse(await readFile(join(f.folder, 'assets', '.markdown-editor-assets.json'), 'utf8')).files).toHaveLength(1);
+  });
+  it('rejects invalid clipboard bytes and excess images before issuing tickets', async () => {
+    const f = await fixture();
+    await expect(f.service.stageBytes([{ bytes: Buffer.from('invalid'), mime: 'image/png', name: 'a.png' }])).rejects.toThrow();
+    await expect(f.service.stageBytes([{ bytes: png, mime: 'text/plain', name: 'a.png' }])).rejects.toThrow();
+    await expect(f.service.stageBytes(Array.from({ length: 31 }, () => ({ bytes: png, mime: 'image/png', name: 'a.png' })))).rejects.toThrow();
+    expect(await readdir(join(f.folder, 'assets')).catch(() => [])).toEqual([]);
+  });
   it('crops an existing unmanaged relative image into assets without modifying the original and supports Save As', async () => {
     const f = await fixture(), before = await readFile(f.image);
     expect(await f.service.readForCrop(f.document, '示意 图.png')).toBe(`data:image/png;base64,${png.toString('base64')}`);

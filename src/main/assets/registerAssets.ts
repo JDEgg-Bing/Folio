@@ -2,6 +2,7 @@ import { dialog, ipcMain, protocol } from 'electron';
 import { ImageAssetService } from './ImageAssetService';
 import type { FileHandleRegistry } from '../files/fileHandles';
 import { userError } from '../../shared/chinese';
+import { stageClipboardImages } from './clipboardImages';
 
 export const imageAssets = new ImageAssetService();
 export function registerAssets(registry: FileHandleRegistry, getWindow: () => Electron.BrowserWindow | null): void {
@@ -16,6 +17,11 @@ export function registerAssets(registry: FileHandleRegistry, getWindow: () => El
     try { return { ok: true, value: await fn(...args) }; } catch (cause) { console.error(cause); return { ok: false, message: userError(cause, 'image') }; }
   };
   ipcMain.handle('asset:stage', safe(async paths => { if (!Array.isArray(paths) || paths.length > 30 || paths.some(path => typeof path !== 'string')) throw new Error('图片请求无效。'); return imageAssets.stage(paths); }));
+  ipcMain.handle('asset:stage-bytes', safe(async files => {
+    if (!Array.isArray(files) || files.length > 30 || files.some(file => !file || typeof file !== 'object')) throw new Error('图片请求无效。');
+    return imageAssets.stageBytes(files);
+  }));
+  ipcMain.handle('asset:clipboard-stage', safe(async () => stageClipboardImages(imageAssets)));
   ipcMain.handle('asset:choose', safe(async () => {
     const parent = getWindow(); if (!parent) throw new Error('窗口已关闭。');
     const result = await dialog.showOpenDialog(parent, { title: '插入图片', properties: ['openFile', 'multiSelections'],
