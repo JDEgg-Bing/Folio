@@ -12,12 +12,14 @@ const command=id=>app.evaluate(({BrowserWindow},id)=>BrowserWindow.getAllWindows
 async function save(){await command('save');await wait(async()=> (await page.locator('.status-document').innerText()).includes('已保存'),'saved');return fs.readFileSync(file,'utf8');}
 async function pixels(bytes){const result=await app.evaluate(({clipboard,nativeImage},b64)=>{const image=b64?nativeImage.createFromBuffer(Buffer.from(b64,'base64')):nativeImage.createFromBitmap(Buffer.alloc(16*16*4,255),{width:16,height:16});clipboard.clear();clipboard.writeImage(image);return {empty:clipboard.readImage().isEmpty(),text:clipboard.readText()};},bytes?.toString('base64'));assert.equal(result.empty,false);assert.equal(result.text,'');}
 async function fileClipboard(files){const json=path.join(output,'clipboard-files.json');fs.writeFileSync(json,JSON.stringify(files));const script=`$ProgressPreference = 'SilentlyContinue'; Add-Type -AssemblyName System.Windows.Forms; $paths = Get-Content -LiteralPath '${json.replaceAll("'","''")}' -Raw -Encoding UTF8 | ConvertFrom-Json; $list = New-Object System.Collections.Specialized.StringCollection; foreach ($item in $paths) { [void]$list.Add($item) }; [System.Windows.Forms.Clipboard]::SetFileDropList($list)`;execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-STA','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:10000});}
-async function end(){await page.locator('.cm-content').focus();await page.keyboard.press('Control+End');}
+async function end(){await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.isVisible()).focus());await page.locator('.cm-content').focus();await page.keyboard.press('Control+End');}
 async function pasteAndSave(pattern,menu=false){if(menu){await page.getByRole('menuitem',{name:'编辑',exact:true}).click();await page.getByRole('menuitem',{name:'粘贴',exact:true}).click();}else await page.keyboard.press('Control+v');await wait(()=>page.locator('.document-figure img').count().then(n=>n>0),'paste image');let text;await wait(async()=>{text=await save();return pattern.test(text);},'paste source');return text;}
 (async()=>{try{
  app=await _electron.launch({executablePath:process.env.FOLIO_ACCEPTANCE_EXECUTABLE||path.join(root,'out/Folio-win32-x64/Folio.exe'),args:[`--user-data-dir=${path.join(output,'profile')}`,file],timeout:30000});page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.locator('.cm-content').waitFor();
  await page.locator('.cm-content').click();await page.keyboard.press('Control+Home');await page.keyboard.press('ArrowDown');await page.keyboard.press('Home');await page.keyboard.down('Shift');await page.keyboard.press('End');await page.keyboard.up('Shift');
- await page.keyboard.press('Control+c');assert.equal(await app.evaluate(({clipboard})=>clipboard.readText()),'replace me');
+ // Exact replacement below verifies the Shift selection. Ctrl+C is covered by
+ // the interaction suite; input-method clipboard history may replay that text
+ // later and overwrite the deliberately installed image fixture.
  const screenshot=await page.screenshot({path:path.join(output,'clipboard-screenshot.png')});await pixels(screenshot);
  let text=await pasteAndSave(/!\[image\]/);assert.match(text,/^above\n!\[image\]\(<assets\/.+\.png>\)\nbelow$/);
  checks.push('Real screenshot pixels pasted with Ctrl+V replace exactly the captured source selection');
@@ -53,6 +55,6 @@ async function pasteAndSave(pattern,menu=false){if(menu){await page.getByRole('m
  assert.equal(await save(),text);assert.equal(await page.locator('.document-figure').count(),7);
  checks.push('Switching document while image staging is pending never pastes into the new document');
  assert.deepEqual(errors,[]);console.log(JSON.stringify({checks,output},null,2));
- }catch(error){if(page&&!page.isClosed()){await page.screenshot({path:path.join(output,'failure.png')});fs.writeFileSync(path.join(output,'failure.txt'),error.stack+'\n'+await page.locator('body').innerText());}throw error;}
+ }catch(error){if(page&&!page.isClosed()){const clipboard=await app.evaluate(({clipboard})=>({formats:clipboard.availableFormats(),text:clipboard.readText(),size:clipboard.readImage().getSize()}));await page.screenshot({path:path.join(output,'failure.png')});fs.writeFileSync(path.join(output,'failure.txt'),error.stack+'\n'+JSON.stringify(clipboard)+'\n'+await page.locator('body').innerText());}throw error;}
  finally{fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,errors},null,2));if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close();}}
 })().catch(error=>{console.error(error);process.exitCode=1;});
