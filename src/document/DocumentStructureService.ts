@@ -3,12 +3,12 @@ import { referenceId } from './markdownSyntax';
 import { semanticText, walkNodes, type DocumentModel, type DocumentNode, type NodeKind, type ReferenceRelation, type ReferenceTarget, type ReferenceType, type TextSource } from './model';
 
 const kinds: Record<string, NodeKind> = {
-  Document: 'document', Paragraph: 'paragraph', BulletList: 'list', OrderedList: 'list', ListItem: 'listItem', Blockquote: 'quote',
+  Document: 'document', Paragraph: 'paragraph', Task: 'paragraph', BulletList: 'list', OrderedList: 'list', ListItem: 'listItem', Blockquote: 'quote',
   FencedCode: 'code', CodeBlock: 'code', HorizontalRule: 'rule', Image: 'image', Table: 'table', TableHeader: 'row', TableRow: 'row', TableCell: 'cell',
   InlineMath: 'math', DisplayMath: 'math', DocumentReference: 'reference', TargetAttribute: 'attribute', TargetAttributeBlock: 'attribute',
   StrongEmphasis: 'strong', Emphasis: 'emphasis', Strikethrough: 'strike', InlineCode: 'inlineCode', Link: 'link', Autolink: 'link', HTMLBlock: 'raw', HTMLTag: 'raw'
 };
-const markers = new Set(['HeaderMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'CodeInfo', 'QuoteMark', 'ListMark', 'LinkMark', 'LinkTitle', 'TableDelimiter', 'TableSeparator', 'URL', 'LinkLabel']);
+const markers = new Set(['HeaderMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'CodeInfo', 'QuoteMark', 'ListMark', 'TaskMarker', 'LinkMark', 'LinkTitle', 'TableDelimiter', 'TableSeparator', 'URL', 'LinkLabel']);
 type CachedNode = { originalFrom: number; node: DocumentNode };
 
 /** Syntax adapter and semantic index. No UI objects or HTML are produced here. */
@@ -30,6 +30,7 @@ export class DocumentStructureService {
     const node: DocumentNode = { id: `node-${++this.sequence}`, kind, from: syntax.from, to: syntax.to, parentId, children: [] };
     if (kind === 'raw' || syntax.name === 'HardBreak') node.sourceType = syntax.name;
     if (heading) node.level = Number(syntax.name.slice(-1));
+    if (syntax.name === 'Task') node.checked = /[xX]/.test(source.read(syntax.from, syntax.from + 3));
     if (kind === 'list') {
       node.ordered = syntax.name === 'OrderedList';
       if (node.ordered) node.start = Number(source.read(syntax.from, Math.min(syntax.to, syntax.from + 12)).match(/^\d+/)?.[0] ?? 1);

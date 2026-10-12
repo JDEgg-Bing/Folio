@@ -21,6 +21,7 @@ export interface PlatformService {
   saveDocumentAs(text: string, options: SaveOptions, suggestedName: string, previousHandleId?: string | null): Promise<SavedDocument | null>;
   resolveImage(handleId: string | null, destination: string): Promise<{ url: string; mime: string }>;
   importImages(handleId: string, tickets: string[]): Promise<{ destination: string; alt: string }[]>;
+  chooseImages(): Promise<string[] | null>;
   onImageDrop(listener: (drop: ImageDrop) => void): () => void;
   setDocumentFeatures(features: Record<string, boolean>): void;
   showMessage(message: string): void;

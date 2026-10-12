@@ -277,6 +277,28 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
     finally { exporting.current = false; }
   }, [platform, preferences]);
 
+  const importImages = useCallback(async (controller: NonNullable<typeof editor.current>, documentId: string, bookmark: string, tickets: string[]) => {
+    if (!tickets.length || editor.current !== controller || metadata.current.id !== documentId) return;
+    if (!metadata.current.fileHandleId && !await save()) return;
+    if (metadata.current.id !== documentId || !metadata.current.fileHandleId || editor.current !== controller) return;
+    const handle = metadata.current.fileHandleId;
+    const images = await platform.importImages(handle, tickets);
+    if (metadata.current.id === documentId && editor.current === controller) {
+      if (metadata.current.fileHandleId === handle) controller.finishImageInsertion(bookmark, images);
+      else setError('文档保存位置已改变，请重新插入图片。');
+    }
+  }, [platform, save]);
+
+  const insertImage = useCallback(async () => {
+    const controller = editor.current; if (!controller) return;
+    const documentId = metadata.current.id, bookmark = controller.beginImageInsertion();
+    try {
+      const tickets = await platform.chooseImages();
+      if (tickets) await importImages(controller, documentId, bookmark, tickets);
+    } catch (cause) { setError(userError(cause, 'image')); }
+    finally { if (editor.current === controller) { controller.cancelImageInsertion(bookmark); controller.focus(); } }
+  }, [platform, importImages]);
+
   const runCommand = useCallback(async (command: string) => {
     if (recovery) return;
     if (document.querySelector('dialog[open]') && !(command === 'sample' && helpMode && !wordTemplatesOpen && !appearanceOpen)) return;
@@ -295,6 +317,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
       case 'export-pdf': await exportManuscript('pdf'); break;
       case 'export-docx': case 'word-templates': setWordTemplatesOpen(true); break;
       case 'find': editor.current?.openSearch(); break;
+      case 'insert-image': await insertImage(); break;
       case 'appearance': setAppearanceOpen(true); break;
       case 'help': setHelpMode('guide'); break;
       case 'about': setHelpMode('about'); break;
@@ -307,7 +330,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
         });
         break;
     }
-  }, [dirtyGuard, open, save, updateDocument, exportManuscript, recovery, replaceCurrent, helpMode, wordTemplatesOpen, appearanceOpen]);
+  }, [dirtyGuard, open, save, updateDocument, exportManuscript, insertImage, recovery, replaceCurrent, helpMode, wordTemplatesOpen, appearanceOpen]);
 
   runCommandRef.current = command => {
     operationQueue.current = operationQueue.current.catch(() => {}).then(() => runCommand(command)).catch(() => setError('无法完成操作，请重试。'));
@@ -357,14 +380,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
     try {
       if (metadata.current.id !== documentId) return;
       if (drop.error) { setError(drop.error); return; }
-      if (!metadata.current.fileHandleId && !await save()) return;
-      if (metadata.current.id !== documentId || !metadata.current.fileHandleId) return;
-      const handle = metadata.current.fileHandleId;
-      const images = await platform.importImages(handle, drop.tickets);
-      if (metadata.current.id === documentId) {
-        if (metadata.current.fileHandleId === handle) controller.finishImageInsertion(bookmark, images);
-        else setError('文档保存位置已改变，请重新拖入图片。');
-      }
+      await importImages(controller, documentId, bookmark, drop.tickets);
     } catch (cause) { setError(userError(cause, 'image')); }
     finally { if (editor.current === controller) controller.cancelImageInsertion(bookmark); }
   };

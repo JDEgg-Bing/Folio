@@ -43,7 +43,7 @@ export interface EditorController {
   getStructure(): DocumentModel;
   jump(position: number): void;
   configurePresentation(features: DocumentFeatures, platform: PlatformService, handle: string | null): void;
-  beginImageInsertion(x: number, y: number): string;
+  beginImageInsertion(x?: number, y?: number): string;
   finishImageInsertion(id: string, images: { destination: string; alt: string }[]): void;
   cancelImageInsertion(id: string): void;
   destroy(): void;
@@ -144,7 +144,7 @@ export function createEditorController(parent: HTMLElement, onUpdate: (snapshot:
       } });
       view.dispatch({ effects: presentation.reconfigure(appearanceExtension) });
     },
-    beginImageInsertion: (x, y) => { const id = crypto.randomUUID(); view.dispatch({ effects: imageInsertionEffect.of({ id, position: view.posAtCoords({ x, y }) ?? view.state.selection.main.head }) }); return id; },
+    beginImageInsertion: (x, y) => { const id = crypto.randomUUID(); view.dispatch({ effects: imageInsertionEffect.of({ id, position: x !== undefined && y !== undefined ? view.posAtCoords({ x, y }) ?? view.state.selection.main.head : view.state.selection.main.head }) }); return id; },
     finishImageInsertion: (id, images) => { const transaction = imageInsertionTransaction(view.state, id, images); if (transaction) view.dispatch(transaction); },
     cancelImageInsertion: id => view.dispatch({ effects: imageInsertionEffect.of({ id, position: null }) }),
     destroy: () => { destroyed = true; if (frame !== null) cancelAnimationFrame(frame); view.scrollDOM.removeEventListener('scroll', onScroll); view.scrollDOM.removeEventListener('wheel', userMoved); view.scrollDOM.removeEventListener('touchstart', userMoved); view.scrollDOM.removeEventListener('pointerdown', userMoved); view.dom.removeEventListener('keydown', navigationKey); view.destroy(); }

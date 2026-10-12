@@ -1,5 +1,7 @@
 .cm-preview-strike { text-decoration: line-through; }
 .cm-formatting { color: var(--text-muted); }
+.cm-preview-bullet { pointer-events: none; }
+.cm-preview-task { width: 0.85em; height: 0.85em; margin: 0; vertical-align: baseline; accent-color: var(--accent); cursor: pointer; }
 
 /* Keep the writing canvas free of interface fonts and decorative containers. */
 .editor-region .cm-content { font-kerning: normal; }

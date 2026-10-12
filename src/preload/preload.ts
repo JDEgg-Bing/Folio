@@ -10,8 +10,8 @@ const dropListeners = new Set<(drop: ImageDrop) => void>();
 window.addEventListener('dragover', event => { if (event.dataTransfer?.types.includes('Files') && (event.target as Element)?.closest('.cm-editor')) event.preventDefault(); });
 window.addEventListener('drop', async event => {
   if (!(event.target as Element)?.closest('.cm-editor') || !event.dataTransfer?.files.length) return;
-  const files = [...event.dataTransfer.files];
-  if (!files.some(file => /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name))) return;
+  const files = [...event.dataTransfer.files].filter(file => /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name));
+  if (!files.length) return;
   event.preventDefault(); event.stopImmediatePropagation();
   const x = event.clientX, y = event.clientY;
   const id = crypto.randomUUID();
@@ -58,6 +58,7 @@ const api: DesktopAPI = {
   saveDocumentAs: (text, options, suggestedName, previousHandleId) => invoke('document:save-as', text, options, suggestedName, previousHandleId),
   resolveImage: (handle, destination) => invoke('asset:resolve', handle, destination),
   importImages: (handle, tickets) => invoke('asset:import', handle, tickets),
+  chooseImages: () => invoke('asset:choose'),
   onImageDrop: listener => { dropListeners.add(listener); return () => { dropListeners.delete(listener); }; },
   setDocumentFeatures: features => ipcRenderer.send('app:features', features),
   onCommand: (listener) => {
