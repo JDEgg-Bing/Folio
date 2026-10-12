@@ -52,6 +52,8 @@ export interface DesktopAPI {
   resolveImage(handleId: string | null, destination: string): Promise<{ url: string; mime: string }>;
   importImages(handleId: string, tickets: string[]): Promise<{ destination: string; alt: string }[]>;
   chooseImages(): Promise<string[] | null>;
+  readImageForCrop(handleId: string | null, destination: string): Promise<string>;
+  importCroppedImage(handleId: string, dataUrl: string): Promise<string>;
   onImageDrop(listener: (drop: ImageDrop) => void): () => void;
   setDocumentFeatures(features: Record<string, boolean>): void;
   onCommand(listener: (command: string) => void): () => void;

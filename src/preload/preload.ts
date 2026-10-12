@@ -59,6 +59,8 @@ const api: DesktopAPI = {
   resolveImage: (handle, destination) => invoke('asset:resolve', handle, destination),
   importImages: (handle, tickets) => invoke('asset:import', handle, tickets),
   chooseImages: () => invoke('asset:choose'),
+  readImageForCrop: (handle, destination) => invoke('asset:crop-read', handle, destination),
+  importCroppedImage: (handle, dataUrl) => invoke('asset:crop-import', handle, dataUrl),
   onImageDrop: listener => { dropListeners.add(listener); return () => { dropListeners.delete(listener); }; },
   setDocumentFeatures: features => ipcRenderer.send('app:features', features),
   onCommand: (listener) => {

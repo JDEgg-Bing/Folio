@@ -13,6 +13,32 @@ async function fixture() {
 }
 afterEach(async () => { for (const folder of folders.splice(0)) { if (!resolve(folder).startsWith(resolve(tmpdir()))) throw new Error('Unsafe test cleanup'); await rm(folder, { recursive: true, force: true }); } });
 describe('image resources and document attachments', () => {
+  it('crops an existing unmanaged relative image into assets without modifying the original and supports Save As', async () => {
+    const f = await fixture(), before = await readFile(f.image);
+    expect(await f.service.readForCrop(f.document, '示意 图.png')).toBe(`data:image/png;base64,${png.toString('base64')}`);
+    const destination = await f.service.importCroppedImage(f.document, `data:image/png;base64,${png.toString('base64')}`);
+    expect(destination).toMatch(/^assets\/[a-f0-9]+\.png$/);
+    expect(await readFile(f.image)).toEqual(before);
+    const resource = await new ImageAssetService().resolve(f.document, destination);
+    expect(resource.mime).toBe('image/png');
+    const next = join(f.folder, 'copy'); await mkdir(next);
+    await f.service.copyForSaveAs(f.document, join(next, 'paper.md'), `![图](<${destination}>)`);
+    expect(await readFile(join(next, destination))).toEqual(png);
+  });
+  it('rejects malformed crop payloads without creating attachments', async () => {
+    const f = await fixture();
+    for (const data of ['data:image/jpeg;base64,AAAA', 'data:image/png;base64,AAAA', 'data:image/png;base64,!!!', 'data:image/png;base64,' + 'A'.repeat(24 * 1024 * 1024)]) {
+      await expect(f.service.importCroppedImage(f.document, data)).rejects.toThrow();
+    }
+    expect(await readdir(join(f.folder, 'assets')).catch(() => [])).toEqual([]);
+  });
+  it('serializes cropping with image imports without losing manifest entries', async () => {
+    const f = await fixture(), svg = join(f.folder, 'other.svg'); await writeFile(svg, '<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const tickets = await f.service.stage([svg]);
+    const [crop] = await Promise.all([f.service.importCroppedImage(f.document, `data:image/png;base64,${png.toString('base64')}`), f.service.import(f.document, tickets)]);
+    expect(crop).toMatch(/^assets\//);
+    expect(JSON.parse(await readFile(join(f.folder, 'assets', '.markdown-editor-assets.json'), 'utf8')).files).toHaveLength(2);
+  });
   it('resolves relative, encoded Chinese, absolute and file URLs independently of UI', () => {
     const doc = join(tmpdir(),'论文','paper.md');
     expect(resolveImagePath(doc,'附件/a b.png')).toBe(resolve(tmpdir(),'论文','附件','a b.png'));

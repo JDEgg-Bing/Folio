@@ -32,4 +32,12 @@ export function registerAssets(registry: FileHandleRegistry, getWindow: () => El
     if (typeof handle !== 'string' || !Array.isArray(ids) || ids.length > 30 || ids.some(id => typeof id !== 'string')) throw new Error('图片导入请求无效。');
     return imageAssets.import(registry.resolve(handle), ids);
   }));
+  ipcMain.handle('asset:crop-read', safe(async (handle, destination) => {
+    if ((handle !== null && typeof handle !== 'string') || typeof destination !== 'string' || destination.length > 4096) throw new Error('图片路径无效。');
+    return imageAssets.readForCrop(handle === null ? null : registry.resolve(handle as string), destination);
+  }));
+  ipcMain.handle('asset:crop-import', safe(async (handle, dataUrl) => {
+    if (typeof handle !== 'string' || typeof dataUrl !== 'string') throw new Error('裁剪图片请求无效。');
+    return imageAssets.importCroppedImage(registry.resolve(handle), dataUrl);
+  }));
 }

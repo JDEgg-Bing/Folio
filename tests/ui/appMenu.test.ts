@@ -12,7 +12,7 @@ describe('desktop menu compatibility', () => {
   it('keeps writing commands and help while excluding destructive developer commands', () => {
     const actions = APP_MENUS.flatMap(menu => menuActions(menu.entries));
     expect(actions.map(action => action.id).sort()).toEqual([
-      'new', 'open', 'save', 'save-as', 'export-pdf', 'export-docx', 'word-templates', 'find', 'insert-image', 'appearance', 'help', 'sample', 'feedback', 'about',
+      'new', 'open', 'save', 'save-as', 'export-pdf', 'export-docx', 'word-templates', 'find', 'insert-image', 'crop-image', 'appearance', 'help', 'sample', 'feedback', 'about',
       'toggle:outlineVisible', 'toggle:mathPreview', 'toggle:imagePreview', 'toggle:tablePreview', 'toggle:referencePreview',
       ...['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll', 'quit', 'resetZoom', 'zoomIn', 'zoomOut', 'togglefullscreen'].map(role => `role:${role}`)
     ].sort());

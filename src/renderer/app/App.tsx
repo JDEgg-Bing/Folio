@@ -10,7 +10,7 @@ import { AppearanceDialog } from '../ui/AppearanceDialog';
 import type { PreferencesService } from '../preferences/PreferencesService';
 import { writingTokens } from '../appearance/writingTokens';
 import { DocumentOutline, currentHeading } from '../ui/DocumentOutline';
-import type { DocumentModel } from '../../document/model';
+import type { DocumentModel, DocumentNode } from '../../document/model';
 import { userError } from '../../shared/chinese';
 import type { ImageDrop } from '../../shared/desktopApi';
 import type { DocumentFeatures } from '../preferences/DocumentFeatures';
@@ -25,6 +25,7 @@ import { HelpDialog, SAMPLE_DOCUMENT, type HelpMode } from '../ui/HelpDialog';
 import { RecoveryDialog } from '../ui/RecoveryDialog';
 import { DecisionDialog } from '../ui/DecisionDialog';
 import type { DecisionRequest } from '../../shared/interaction';
+import { ImageCropDialog } from '../ui/ImageCropDialog';
 
 export function App({ platform, preferences }: { platform: PlatformService; preferences: PreferencesService }) {
   const editorHost = useRef<HTMLDivElement>(null);
@@ -34,6 +35,10 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
   const runCommandRef = useRef<(command: string) => void>(() => undefined);
   const dropRef = useRef<(drop: ImageDrop) => void>(() => {});
   const pendingDrops = useRef(new Map<string, { documentId: string; bookmark: string; controller: ReturnType<typeof createEditorController> }>());
+  const cropRef = useRef<(node: DocumentNode) => void>(() => {});
+  const [crop, setCrop] = useState<{ node: DocumentNode; controller: ReturnType<typeof createEditorController>; doc: ReturnType<ReturnType<typeof createEditorController>['getDocument']>; documentId: string; load: () => Promise<string> } | null>(null);
+  // Focus after the native modal is removed, when the editor is no longer inert.
+  useEffect(() => { if (!crop) editor.current?.focus(); }, [crop]);
   const requestCloseRef = useRef<() => void>(() => undefined);
   const appearance = useSyncExternalStore(preferences.subscribe, preferences.getSnapshot);
   useLayoutEffect(() => {
@@ -299,6 +304,25 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
     finally { if (editor.current === controller) { controller.cancelImageInsertion(bookmark); controller.focus(); } }
   }, [platform, importImages]);
 
+  cropRef.current = node => {
+    const controller = editor.current;
+    if (!controller || !node.destination || document.querySelector('dialog[open]')) return;
+    const handle = metadata.current.fileHandleId;
+    setCrop({ node, controller, doc: controller.getDocument(), documentId: metadata.current.id, load: () => platform.readImageForCrop(handle, node.destination!) });
+  };
+  const applyCrop = async (dataUrl: string) => {
+    if (!crop) return false;
+    const valid = () => editor.current === crop.controller && metadata.current.id === crop.documentId && crop.controller.getDocument() === crop.doc;
+    if (!valid()) throw new Error('文稿已改变，请关闭裁剪窗口后重试。');
+    if (!metadata.current.fileHandleId && !await save()) return false;
+    if (!valid() || !metadata.current.fileHandleId) throw new Error('文稿已改变，请重试。');
+    const handle = metadata.current.fileHandleId;
+    const destination = await platform.importCroppedImage(handle, dataUrl);
+    if (!valid() || metadata.current.fileHandleId !== handle) throw new Error('文稿或保存位置已改变，未替换图片。');
+    if (!crop.controller.replaceCroppedImage(crop.node, destination)) throw new Error('图片语句已改变，未替换图片。');
+    return true;
+  };
+
   const runCommand = useCallback(async (command: string) => {
     if (recovery) return;
     if (document.querySelector('dialog[open]') && !(command === 'sample' && helpMode && !wordTemplatesOpen && !appearanceOpen)) return;
@@ -318,6 +342,12 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
       case 'export-docx': case 'word-templates': setWordTemplatesOpen(true); break;
       case 'find': editor.current?.openSearch(); break;
       case 'insert-image': await insertImage(); break;
+      case 'crop-image': {
+        const node = editor.current?.selectedImage();
+        if (node) cropRef.current(node);
+        else setError('请将光标放在图片 Markdown 语句中，再选择“裁剪图片”；也可以点击预览图片旁的“裁剪”按钮。');
+        break;
+      }
       case 'appearance': setAppearanceOpen(true); break;
       case 'help': setHelpMode('guide'); break;
       case 'about': setHelpMode('about'); break;
@@ -367,7 +397,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
       await requestClose();
     }).catch(() => platform.completeClose(false));
   };
-  useEffect(() => { editor.current?.configurePresentation(appearance.documentFeatures, platform, documentMetadata.fileHandleId); platform.setDocumentFeatures({ ...appearance.documentFeatures }); }, [appearance.documentFeatures, platform, documentMetadata.fileHandleId]);
+  useEffect(() => { editor.current?.configurePresentation(appearance.documentFeatures, platform, documentMetadata.fileHandleId, node => cropRef.current(node)); platform.setDocumentFeatures({ ...appearance.documentFeatures }); }, [appearance.documentFeatures, platform, documentMetadata.fileHandleId]);
   dropRef.current = async (drop) => {
     const controller = editor.current; if (!controller) return;
     if (drop.phase === 'start') {
@@ -395,6 +425,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
       {appearance.documentFeatures.outlineVisible && <DocumentOutline headings={structure?.headings ?? []} active={currentHeading(structure?.headings ?? [], readingPosition)} onJump={position => editor.current?.jump(position)} onClose={() => preferences.updateDocumentFeatures({ outlineVisible: false })} />}
     </div>
     <StatusBar document={documentMetadata} snapshot={editorSnapshot} />
+    {crop && <ImageCropDialog load={crop.load} onApply={applyCrop} onClose={() => setCrop(null)} />}
     {recovery && <RecoveryDialog recovery={recovery} onDecide={async restore => {
       if (restore) {
         const recovered = recovery.document;

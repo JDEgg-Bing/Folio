@@ -13,6 +13,8 @@ import { documentTitleField } from '../document/DocumentTitle';
 import { wordCountField } from './wordCount';
 import { navigationBottomPadding, NAVIGATION_TOP_MARGIN } from './navigationLayout';
 import { ReadingTracker } from './ReadingTracker';
+import { imageCropTransaction } from './imageCrop';
+import type { DocumentNode } from '../../document/model';
 
 export interface EditorSnapshot { line: number; column: number; dirty: boolean; headingTitle: string | null; wordCount: number }
 export interface SaveSnapshot { doc: Text; text: string }
@@ -42,7 +44,9 @@ export interface EditorController {
   isDirty(): boolean;
   getStructure(): DocumentModel;
   jump(position: number): void;
-  configurePresentation(features: DocumentFeatures, platform: PlatformService, handle: string | null): void;
+  configurePresentation(features: DocumentFeatures, platform: PlatformService, handle: string | null, cropImage?: (node: DocumentNode) => void): void;
+  selectedImage(): DocumentNode | null;
+  replaceCroppedImage(node: DocumentNode, destination: string): boolean;
   beginImageInsertion(x?: number, y?: number): string;
   finishImageInsertion(id: string, images: { destination: string; alt: string }[]): void;
   cancelImageInsertion(id: string): void;
@@ -137,9 +141,11 @@ export function createEditorController(parent: HTMLElement, onUpdate: (snapshot:
     markSaved: (doc) => { saved.markSaved(doc); onUpdate(snapshot()); },
     isDirty: () => saved.isDirty(view.state.doc),
     getStructure: () => view.state.field(structureField), jump,
-    configurePresentation: (features, platform, handle) => {
+    selectedImage: () => view.state.field(structureField).images.find(node => node.from <= view.state.selection.main.head && node.to >= view.state.selection.main.head) ?? null,
+    replaceCroppedImage: (node, destination) => { const transaction = imageCropTransaction(view.state, node, destination); if (!transaction) return false; view.dispatch(transaction); return true; },
+    configurePresentation: (features, platform, handle, cropImage) => {
       const cache = new Map<string, Promise<{ url: string; mime: string }>>();
-      appearanceExtension = previewEnvironment.of({ features, jump, resolveImage: destination => {
+      appearanceExtension = previewEnvironment.of({ features, jump, cropImage, resolveImage: destination => {
         if (!cache.has(destination)) cache.set(destination, platform.resolveImage(handle, destination)); return cache.get(destination)!;
       } });
       view.dispatch({ effects: presentation.reconfigure(appearanceExtension) });

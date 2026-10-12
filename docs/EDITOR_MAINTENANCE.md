@@ -1,5 +1,30 @@
 # Markdown 编辑器维护记录
 
+## 1.2.1 图片裁剪补充
+
+问题定位：1.2.0 仅实现图片插入、资源解析和预览，未实现图片裁剪；不是用户文稿损坏或设置丢失。新增功能继续使用 CodeMirror 源文、PlatformService、受限 IPC 和 ImageAssetService，不更换解析或资源架构。
+
+| 文件 | 作用 |
+| --- | --- |
+| `src/renderer/ui/ImageCropDialog.tsx` | 原生模态裁剪界面、拖选区域、像素输入、重置／取消、PNG 编码 |
+| `src/renderer/editor/imageCrop.ts` | 像素边界与基于语法树的单图片源文替换；保留 alt／直接链接 title，引用式图片仅转换当前语句 |
+| `src/renderer/editor/EditorController.ts` | 定位当前图片、提交独立的可撤销裁剪事务、预览操作回调 |
+| `src/renderer/editor/extensions/documentPreview.ts` | 已加载本地图片旁显示裁剪按钮，按钮事件不触发源码切换 |
+| `src/renderer/app/App.tsx` | 裁剪会话、文档身份和内容校验、保存位置保护、关闭后恢复编辑器焦点 |
+| `src/shared/appMenu.ts` | “编辑 → 裁剪图片…”入口 |
+| `src/shared/desktopApi.ts`、`src/preload/preload.ts`、`src/renderer/platform/PlatformService.ts`、`src/renderer/platform/ElectronPlatformService.ts` | 两个受限图片裁剪桥接方法 |
+| `src/main/assets/registerAssets.ts` | 校验请求来源、文档句柄与参数 |
+| `src/main/assets/ImageAssetService.ts` | 读取已有图片、验证 PNG 结果，复用串行导入、哈希命名、清单、回滚与另存迁移；原图不覆盖 |
+| `src/renderer/styles/app.css` | 不覆盖正文的按钮和裁剪弹窗样式 |
+| `src/renderer/ui/HelpDialog.tsx`、`docs/USER_GUIDE.md` | 内置及外部指南、入口发现与图片目录说明 |
+| `tests/editor/imageCrop.test.ts`、`tests/files/imageAssets.test.ts`、`tests/ui/appMenu.test.ts` | 源文保留、引用隔离、撤销重做、边界、载荷验证、并发与菜单兼容 |
+| `scripts/image-crop-acceptance.cjs` | 使用隔离资料和真实应用窗口验证裁剪像素、保存重开、导出与迁移 |
+| `package.json`、`package-lock.json`、`CHANGELOG.md`、`docs/CURRENT_STATE.md` | 版本 1.2.1 与功能记录 |
+
+验证：439 项测试通过，TypeScript 与 OSS 检查通过；真实打包窗口裁剪验收 12 项通过，包含相对／Windows 绝对／引用式图片、取消、拖动像素映射、原图保留、单步撤销重做、关闭预览后的菜单入口、重启、PNG 再裁剪、JPEG 裁剪、PDF／DOCX 与另存为。截图及报告存放在 `out/image-crop/`。裁剪上限 3200 万像素，PNG 载荷上限 24 MiB（含 base64）；动图结果为静态 PNG，网络图片沿用现有限制。
+
+以下保留 1.2.0 维护记录。
+
 日期：2026-10-12。范围：GFM 任务列表、无序列表、鼠标选择与图片导入。基于当前本地工作区实现，保留进入任务前已有的未提交改动。本记录涵盖编辑器修复；GitHub 推送与本机安装结果以部署操作回执为准。
 
 ## 阅读与架构结论
