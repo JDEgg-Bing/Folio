@@ -138,12 +138,13 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
     updateDocument(metadata.current);
     const removeCommand = platform.onCommand((command) => { runCommandRef.current(command); });
     const removeDrop = platform.onImageDrop(drop => dropRef.current(drop));
+    const removePaste = platform.onImagePaste(paste => dropRef.current(paste));
     const removeClose = platform.onCloseRequest(() => { requestCloseRef.current(); });
     const removeExternal = platform.onOpenDocument(() => {
       operationQueue.current = operationQueue.current.catch(() => {}).then(() => externalOpenRef.current());
     });
     controller.focus();
-    return () => { removeCommand(); removeClose(); removeDrop(); removeExternal(); if (recoveryTimer.current !== null) clearTimeout(recoveryTimer.current); recoveryTimer.current = null; pendingDrops.current.clear(); controller.destroy(); editor.current = null; };
+    return () => { removeCommand(); removeClose(); removeDrop(); removePaste(); removeExternal(); if (recoveryTimer.current !== null) clearTimeout(recoveryTimer.current); recoveryTimer.current = null; pendingDrops.current.clear(); controller.destroy(); editor.current = null; };
   }, [platform]);
 
   useEffect(() => {
@@ -401,7 +402,7 @@ export function App({ platform, preferences }: { platform: PlatformService; pref
   dropRef.current = async (drop) => {
     const controller = editor.current; if (!controller) return;
     if (drop.phase === 'start') {
-      pendingDrops.current.set(drop.id, { documentId: metadata.current.id, bookmark: controller.beginImageInsertion(drop.x, drop.y), controller });
+      pendingDrops.current.set(drop.id, { documentId: metadata.current.id, bookmark: controller.beginImageInsertion(drop.x, drop.y, drop.replaceSelection), controller });
       return;
     }
     const pending = pendingDrops.current.get(drop.id); pendingDrops.current.delete(drop.id);

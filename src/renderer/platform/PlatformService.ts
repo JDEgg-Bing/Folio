@@ -25,6 +25,7 @@ export interface PlatformService {
   readImageForCrop: import('../../shared/desktopApi').DesktopAPI['readImageForCrop'];
   importCroppedImage: import('../../shared/desktopApi').DesktopAPI['importCroppedImage'];
   onImageDrop(listener: (drop: ImageDrop) => void): () => void;
+  onImagePaste: import('../../shared/desktopApi').DesktopAPI['onImagePaste'];
   setDocumentFeatures(features: Record<string, boolean>): void;
   showMessage(message: string): void;
   onCommand(listener: (command: string) => void): () => void;

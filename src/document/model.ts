@@ -5,6 +5,8 @@ export interface DocumentNode extends SourceRange {
   id: string; kind: NodeKind; parentId: string | null; children: DocumentNode[];
   text?: string; level?: number; destination?: string; display?: boolean;
   sourceText?: string; ordered?: boolean; start?: number;
+  /** A complete image on its own source line, shared by preview and exports. */
+  imageLayout?: 'block' | 'inline';
   /** Present only on a GFM task paragraph. */
   checked?: boolean;
   sourceType?: string;

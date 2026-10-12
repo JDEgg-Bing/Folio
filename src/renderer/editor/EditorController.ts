@@ -47,7 +47,7 @@ export interface EditorController {
   configurePresentation(features: DocumentFeatures, platform: PlatformService, handle: string | null, cropImage?: (node: DocumentNode) => void): void;
   selectedImage(): DocumentNode | null;
   replaceCroppedImage(node: DocumentNode, destination: string): boolean;
-  beginImageInsertion(x?: number, y?: number): string;
+  beginImageInsertion(x?: number, y?: number, replaceSelection?: boolean): string;
   finishImageInsertion(id: string, images: { destination: string; alt: string }[]): void;
   cancelImageInsertion(id: string): void;
   destroy(): void;
@@ -150,7 +150,7 @@ export function createEditorController(parent: HTMLElement, onUpdate: (snapshot:
       } });
       view.dispatch({ effects: presentation.reconfigure(appearanceExtension) });
     },
-    beginImageInsertion: (x, y) => { const id = crypto.randomUUID(); view.dispatch({ effects: imageInsertionEffect.of({ id, position: x !== undefined && y !== undefined ? view.posAtCoords({ x, y }) ?? view.state.selection.main.head : view.state.selection.main.head }) }); return id; },
+    beginImageInsertion: (x, y, replaceSelection = false) => { const id = crypto.randomUUID(), range = view.state.selection.main; view.dispatch({ effects: imageInsertionEffect.of({ id, position: replaceSelection ? range.from : x !== undefined && y !== undefined ? view.posAtCoords({ x, y }) ?? range.head : range.head, to: replaceSelection ? range.to : undefined }) }); return id; },
     finishImageInsertion: (id, images) => { const transaction = imageInsertionTransaction(view.state, id, images); if (transaction) view.dispatch(transaction); },
     cancelImageInsertion: id => view.dispatch({ effects: imageInsertionEffect.of({ id, position: null }) }),
     destroy: () => { destroyed = true; if (frame !== null) cancelAnimationFrame(frame); view.scrollDOM.removeEventListener('scroll', onScroll); view.scrollDOM.removeEventListener('wheel', userMoved); view.scrollDOM.removeEventListener('touchstart', userMoved); view.scrollDOM.removeEventListener('pointerdown', userMoved); view.dom.removeEventListener('keydown', navigationKey); view.destroy(); }

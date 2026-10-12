@@ -31,6 +31,11 @@ async function imageFile(path: string): Promise<{ bytes: Buffer; mime: string }>
   const metadata = await stat(path);
   if (!metadata.isFile() || metadata.size > 50 * 1024 * 1024) throw new Error('图片不是有效文件或超过 50 MB。');
   const bytes = await readFile(path);
+  validateImageBytes(bytes, mime);
+  return { bytes, mime };
+}
+function validateImageBytes(bytes: Buffer, mime: string): void {
+  if (!bytes.length || bytes.length > 50 * 1024 * 1024) throw new Error('图片不是有效文件或超过 50 MB。');
   const valid = mime === 'image/png' ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
     : mime === 'image/jpeg' ? bytes[0] === 255 && bytes[1] === 216
     : mime === 'image/gif' ? bytes.subarray(0, 6).toString().startsWith('GIF8')
@@ -39,7 +44,6 @@ async function imageFile(path: string): Promise<{ bytes: Buffer; mime: string }>
     : mime === 'image/avif' ? bytes.subarray(4, 8).toString() === 'ftyp' && /avif|avis/.test(bytes.subarray(8, 32).toString())
     : /<svg(?:\s|>)/i.test(bytes.subarray(0, 65536).toString());
   if (!valid) throw new Error('图片文件损坏或格式不匹配。');
-  return { bytes, mime };
 }
 async function readManifest(folder: string): Promise<Manifest | null> {
   const path = join(folder, manifestName);
@@ -77,10 +81,22 @@ export class ImageAssetService {
     finally { this.tickets.delete(id); }
   }
   async stage(paths: string[]): Promise<string[]> {
+    if (paths.length > 30) throw new Error('一次最多插入 30 张图片。');
     for (const [id, ticket] of this.tickets) if (ticket.expires < Date.now()) this.tickets.delete(id);
     const ids: string[] = [];
     for (const path of paths) { await imageFile(path); const id = randomUUID(); this.tickets.set(id, { path, expires: Date.now() + 300000 }); ids.push(id); }
     return ids;
+  }
+  async stageBytes(files: { bytes: Uint8Array; mime: string; name: string }[]): Promise<string[]> {
+    if (files.length > 30) throw new Error('一次最多插入 30 张图片。');
+    for (const [id, ticket] of this.tickets) if (ticket.expires < Date.now()) this.tickets.delete(id);
+    const prepared = files.map(file => {
+      const extension = Object.entries(mimeTypes).find(([, mime]) => mime === file.mime)?.[0];
+      if (!extension || !(file.bytes instanceof Uint8Array) || typeof file.name !== 'string') throw new Error('不支持此图片格式。');
+      const bytes = Buffer.from(file.bytes); validateImageBytes(bytes, file.mime);
+      return { bytes, mime: file.mime, name: `${basename(file.name, extname(file.name)) || 'image'}${extension}`, expires: Date.now() + 300000 };
+    });
+    return prepared.map(ticket => { const id = randomUUID(); this.tickets.set(id, ticket); return id; });
   }
   async resolve(documentPath: string | null, destination: string): Promise<{ url: string; mime: string }> {
     const path = resolveImagePath(documentPath, destination), { mime } = await imageFile(path);

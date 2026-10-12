@@ -106,6 +106,16 @@ export class DocumentStructureService {
       }
     };
     bind(root);
+    walkNodes(root, parent => {
+      if (!parent.children.some(child => child.kind === 'image')) return;
+      const text = source.read(parent.from, parent.to);
+      for (const child of parent.children) if (child.kind === 'image') {
+        const from = child.from - parent.from, to = (child.attribute?.to ?? child.to) - parent.from;
+        const before = text.slice(text.lastIndexOf('\n', from - 1) + 1, from);
+        const lineEnd = text.indexOf('\n', to), after = text.slice(to, lineEnd < 0 ? text.length : lineEnd);
+        child.imageLayout = parent.kind === 'paragraph' && parent.checked === undefined && /^[ \t]*(?:> ?)*$/.test(before) && !after.trim() ? 'block' : 'inline';
+      }
+    });
     const counters = { fig: 0, tbl: 0, eq: 0 };
     walkNodes(root, node => {
       if (node.kind === 'heading') headings.push(node);

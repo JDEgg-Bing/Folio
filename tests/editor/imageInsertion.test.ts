@@ -9,8 +9,9 @@ describe('image insertion paragraph boundaries', () => {
     state = state.update({ effects: imageInsertionEffect.of({ id: 'image', position: before.length }) }).state;
     state = state.update(imageInsertionTransaction(state, 'image', [{ alt: 'image', destination: 'assets/image.png' }])!).state;
     const source = state.doc.toString(); expect(source.startsWith(before)).toBe(true);
-    const model = modelFor(source), paragraph = model.root.children.find(node => node.children.some(child => child.kind === 'image'))!;
-    expect(paragraph.children.filter(child => child.kind === 'text').every(child => !child.text?.trim())).toBe(true);
+    const model = modelFor(source);
+    expect(model.images[0].imageLayout).toBe('block');
+    expect(source).toBe(`${before}${before && !before.endsWith('\n') ? '\n' : ''}![image](<assets/image.png>)\n`);
     expect(model.images).toHaveLength(1); expect(model.images[0].destination).toBe('assets/image.png');
   });
   it('does not add empty text when an asynchronous insertion has no images or lost its bookmark', () => {

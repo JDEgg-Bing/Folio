@@ -7,6 +7,29 @@ async function invoke(channel: string, ...args: unknown[]) {
   return result.value;
 }
 const dropListeners = new Set<(drop: ImageDrop) => void>();
+const pasteListeners = new Set<(paste: ImageDrop) => void>();
+window.addEventListener('paste', async event => {
+  if (!(event.target as Element)?.closest('.cm-content') || !event.clipboardData) return;
+  const data = event.clipboardData;
+  const files = [...data.files].filter(file => /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(file.name) || /^image\//.test(file.type));
+  // Text and HTML retain their normal CodeMirror paste path. An empty clipboard
+  // may contain a Windows file list or pixels that Chromium did not expose.
+  if (!files.length && !data.types.includes('Files') && (data.getData('text/plain') || data.getData('text/html'))) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  const id = crypto.randomUUID(), notify = (phase: 'start' | 'ready', tickets: string[] = [], error?: string) => {
+    for (const listener of pasteListeners) listener({ id, phase, replaceSelection: true, tickets, error });
+  };
+  notify('start');
+  try {
+    if (files.length > 30 || files.some(file => file.size > 50 * 1024 * 1024)) throw new Error('一次最多插入 30 张图片，单张不超过 50 MB。');
+    let tickets: string[];
+    if (files.length) {
+      const paths = files.map(file => webUtils.getPathForFile(file));
+      tickets = paths.every(Boolean) ? await invoke('asset:stage', paths) : await invoke('asset:stage-bytes', await Promise.all(files.map(async file => ({ bytes: new Uint8Array(await file.arrayBuffer()), mime: file.type || ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' } as Record<string, string>)[file.name.split('.').at(-1)!.toLowerCase()], name: file.name }))));
+    } else tickets = await invoke('asset:clipboard-stage');
+    notify('ready', tickets);
+  } catch { notify('ready', [], '无法粘贴图片，请检查格式、大小和文件是否可读取。'); }
+}, true);
 window.addEventListener('dragover', event => { if (event.dataTransfer?.types.includes('Files') && (event.target as Element)?.closest('.cm-editor')) event.preventDefault(); });
 window.addEventListener('drop', async event => {
   if (!(event.target as Element)?.closest('.cm-editor') || !event.dataTransfer?.files.length) return;
@@ -62,6 +85,7 @@ const api: DesktopAPI = {
   readImageForCrop: (handle, destination) => invoke('asset:crop-read', handle, destination),
   importCroppedImage: (handle, dataUrl) => invoke('asset:crop-import', handle, dataUrl),
   onImageDrop: listener => { dropListeners.add(listener); return () => { dropListeners.delete(listener); }; },
+  onImagePaste: listener => { pasteListeners.add(listener); return () => { pasteListeners.delete(listener); }; },
   setDocumentFeatures: features => ipcRenderer.send('app:features', features),
   onCommand: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, command: string) => listener(command);

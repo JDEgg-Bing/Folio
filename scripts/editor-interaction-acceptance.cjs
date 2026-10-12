@@ -10,9 +10,11 @@ import {createEditorController} from ${sourceImport('src/renderer/editor/EditorC
 import {EditorView} from '@codemirror/view';
 import {writingTokens} from ${sourceImport('src/renderer/appearance/writingTokens')};
 import {DEFAULT_WRITING_APPEARANCE} from ${sourceImport('src/renderer/preferences/WritingAppearance')};
+import {DEFAULT_DOCUMENT_FEATURES} from ${sourceImport('src/renderer/preferences/DocumentFeatures')};
 for(const [key,value] of Object.entries(writingTokens(DEFAULT_WRITING_APPEARANCE))) document.body.style.setProperty(key,String(value));
 window.controller=createEditorController(document.querySelector('.editor-region'),()=>{});
 window.editorView=EditorView.findFromDOM(document.querySelector('.cm-editor'));
+window.controller.configurePresentation(DEFAULT_DOCUMENT_FEATURES,{resolveImage:async(_handle,destination)=>{if(destination.includes('slow'))await new Promise(resolve=>setTimeout(resolve,1000));return {url:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="160"><rect width="400" height="160" fill="green"/></svg>'),mime:'image/svg+xml'};}},null,()=>{});
 `);
 require('esbuild').buildSync({ entryPoints: [path.join(output, 'entry.ts')], bundle: true, platform: 'browser', outfile: path.join(output, 'editor.js') });
 fs.writeFileSync(path.join(output, 'index.html'), `<html><head>${['variables', 'app', 'editor'].map(name => `<link rel="stylesheet" href="${path.join(root, `src/renderer/styles/${name}.css`).replaceAll('\\', '/')}">`).join('')}</head><body><div class="app-shell"><div class="editor-region"></div></div><script src="editor.js"></script></body></html>`);
@@ -93,6 +95,60 @@ async function drag(source, from, to) {
     assert.equal(await page.locator('.document-table').count(), 0);
     assert.equal(await page.evaluate(() => window.controller.getDocumentText()), across);
     checks.push('Table click still opens source without changing Markdown');
+    const adjacent = 'alpha bravo charlie\n![picture](assets/picture.svg)\ndelta echo foxtrot\n![second](assets/picture.svg)\ngolf hotel';
+    await load(adjacent); await page.locator('.document-figure img').first().waitFor();
+    await page.waitForFunction(() => [...document.querySelectorAll('.document-figure img')].every(img => img.complete && img.naturalWidth));
+    for (const position of [adjacent.indexOf('bravo') + 2, adjacent.indexOf('echo') + 2]) {
+      const [point] = await points([position]); await page.mouse.click(point.x, point.y);
+      assert.equal((await selection()).from, position); await page.keyboard.type('Z');
+      assert.equal(await page.evaluate(() => window.controller.getDocumentText()), adjacent.slice(0, position) + 'Z' + adjacent.slice(position));
+      await page.keyboard.press('Control+z'); assert.equal(await page.evaluate(() => window.controller.getDocumentText()), adjacent);
+    }
+    checks.push('Single-newline images: text above and below accepts native clicks and exact typing');
+    await drag(adjacent, 6, adjacent.indexOf('foxtrot') + 7);
+    await drag(adjacent, adjacent.indexOf('foxtrot') + 7, 6);
+    await load(adjacent); const [imageWord] = await points([adjacent.indexOf('echo') + 2]); await page.mouse.dblclick(imageWord.x, imageWord.y);
+    assert.equal((await selection()).text, 'echo'); await page.keyboard.press('Control+c'); assert.equal(await app.evaluate(({clipboard})=>clipboard.readText()), 'echo');
+    checks.push('Forward/reverse selection across images and double-click/copy below image match Markdown');
+    const layout = await page.locator('.document-figure').evaluateAll(figures => figures.map(figure => {
+      const image = figure.querySelector('img').getBoundingClientRect(), button = figure.querySelector('button').getBoundingClientRect(), style = getComputedStyle(figure);
+      return { margin: style.marginTop, contained: button.top >= image.top && button.bottom <= image.bottom };
+    }));
+    assert.ok(layout.every(item => item.margin === '0px' && item.contained));
+    checks.push('Block margins are zero and crop controls stay inside image pixels');
+    const loading='alpha bravo\n![slow](slow.svg)\ndelta echo';await load(loading);
+    assert.equal(await page.locator('.document-figure img').count(),0);
+    const [loadingPoint]=await points([loading.indexOf('echo')]);await page.mouse.click(loadingPoint.x,loadingPoint.y);assert.equal((await selection()).from,loading.indexOf('echo'));
+    await page.locator('.document-figure img').waitFor();await page.waitForTimeout(80);
+    const [loadedPoint]=await points([loading.indexOf('echo')]);await page.mouse.click(loadedPoint.x,loadedPoint.y);
+    if((await selection()).from!==loading.indexOf('echo')) { console.log(await page.evaluate(point=>{const v=window.editorView,c=document.caretPositionFromPoint(point.x,point.y);return {point,hit:v.posAtCoords(point),dom:v.posAtDOM(c.offsetNode,c.offset),top:v.documentTop,height:v.contentHeight,block:v.lineBlockAt(36),lines:[...v.contentDOM.children].map(el=>({text:el.textContent,top:el.getBoundingClientRect().top,height:el.getBoundingClientRect().height})),element:document.elementFromPoint(point.x,point.y)?.outerHTML};},loadedPoint));await page.screenshot({path:path.join(output,'loading-hit.png')}); }
+    assert.equal((await selection()).from,loading.indexOf('echo'));
+    for(const zoom of [1.25,0.8]){
+      await app.evaluate(({BrowserWindow},zoom)=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(zoom),zoom);
+      await load(('scroll line\n'.repeat(20))+adjacent);await page.keyboard.press('Control+End');await page.waitForTimeout(100);
+      const position=('scroll line\n'.repeat(20)).length+adjacent.indexOf('echo')+2;
+      const [point]=await points([position]);await page.mouse.click(point.x,point.y);assert.equal((await selection()).from,position);
+    }
+    await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1));
+    checks.push('Text hit testing stays precise before/after image loading, scrolling and 80%/125% zoom');
+    const navigation = 'alpha bravo '+ 'long wrapped content '.repeat(12)+'\n\n**bold words**\n- item one\n- item two\n\n![picture](a.svg)\ndelta echo\n\n| a | b |\n| --- | --- |\n| c | d |\n\nlast line';
+    await load(navigation); await page.waitForTimeout(150); await page.locator('.cm-content').click(); await page.keyboard.press('Control+Home');
+    const beforeNavigation = await page.evaluate(() => ({height:window.editorView.contentHeight,images:document.querySelectorAll('.document-figure').length,tables:document.querySelectorAll('.document-table').length}));
+    let last = 0;
+    for (let i = 0; i < 35; i++) { await page.keyboard.press('ArrowDown'); const current = (await selection()).to; assert.ok(current >= last, `${current} < ${last}`); last = current; }
+    assert.equal(last, navigation.length);
+    for (let i = 0; i < 35; i++) { await page.keyboard.press('ArrowUp'); const current = (await selection()).from; assert.ok(current <= last, `${current} > ${last}`); last = current; }
+    assert.equal(last, 0);
+    assert.deepEqual(await page.evaluate(() => ({height:window.editorView.contentHeight,images:document.querySelectorAll('.document-figure').length,tables:document.querySelectorAll('.document-table').length})),beforeNavigation);
+    await page.keyboard.down('Shift'); for(let i=0;i<35;i++) await page.keyboard.press('ArrowDown'); await page.keyboard.up('Shift');
+    assert.deepEqual(await selection(),{from:0,to:navigation.length,text:navigation});
+    await page.keyboard.press('Control+c'); assert.equal(await app.evaluate(({clipboard})=>clipboard.readText()),navigation);
+    assert.equal(await page.locator('.document-figure').count(),beforeNavigation.images);
+    checks.push('Repeated Up/Down and Shift expansion through wrapped text, lists, blanks, image and table retain layout and stop at document boundaries');
+    await load(adjacent); await page.locator('.document-figure img').first().click();
+    assert.equal(await page.locator('.document-figure').count(),1);
+    assert.equal(await page.evaluate(() => window.controller.getDocumentText()),adjacent);
+    checks.push('Only clicking the image explicitly opens its source');
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ checks, output }, null, 2));
   } finally {

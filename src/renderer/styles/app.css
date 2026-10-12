@@ -73,10 +73,14 @@ body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--ui-font-f
 .document-math-block > :first-child { grid-column: 2; }
 .document-math-block .katex-display { margin: 0; }
 .document-equation-number { grid-column: 3; justify-self: end; padding-left: 1em; }
-.document-figure { margin: var(--writing-paragraph-spacing) 0; text-align: center; }
+.document-figure { display: flow-root; position: relative; margin: 0; text-align: center; }
 .document-figure img { display: block; max-width: 100%; max-height: 70vh; height: auto; margin: 0 auto; }
+.document-image-picture { position: relative; display: inline-block; max-width: 100%; vertical-align: middle; }
+.document-image-picture:has(.document-image-crop) { min-width: 52px; min-height: 28px; }
+.document-figure .document-image-picture { display: block; width: fit-content; margin: 0 auto; }
 .document-image-inline img { max-width: 100%; max-height: 2em; vertical-align: middle; }
-.document-image-crop { display: inline-block; margin: 4px 0 4px 8px; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); font: 12px/1.5 var(--ui-font-family); cursor: pointer; vertical-align: middle; }
+.document-image-inline { position: relative; }
+.document-image-crop { position: absolute; top: 2px; right: 2px; margin: 0; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); font: 12px/1.5 var(--ui-font-family); cursor: pointer; }
 .document-image-crop:hover { color: var(--accent); border-color: var(--accent); }
 .image-crop-dialog { width: min(760px, calc(100vw - 32px)); }
 .image-crop-body { overflow: auto; }

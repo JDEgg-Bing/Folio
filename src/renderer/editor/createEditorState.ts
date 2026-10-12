@@ -13,7 +13,8 @@ import { livePreview } from './extensions/livePreview';
 import { writingHighlightStyle, writingTheme } from '../appearance/writingTheme';
 import { documentTitle, documentTitleField } from '../document/DocumentTitle';
 import { wordCountField } from './wordCount';
-import { previewSelectionField } from './previewSelection';
+import { previewSelectionField, stableVerticalNavigation } from './previewSelection';
+import { cursorLineUp, cursorLineDown, selectLineUp, selectLineDown } from '@codemirror/commands';
 
 export function createEditorExtensions(onUpdate: (snapshot: EditorSnapshot) => void) {
   return [
@@ -37,6 +38,8 @@ export function createEditorExtensions(onUpdate: (snapshot: EditorSnapshot) => v
       }
     }),
     keymap.of([
+      { key: 'ArrowUp', run: stableVerticalNavigation(cursorLineUp), shift: stableVerticalNavigation(selectLineUp), preventDefault: true },
+      { key: 'ArrowDown', run: stableVerticalNavigation(cursorLineDown), shift: stableVerticalNavigation(selectLineDown), preventDefault: true },
       { key: 'Mod-z', run: (view) => undo(view) },
       { key: 'Mod-Shift-z', run: (view) => redo(view) },
       { key: 'Mod-f', run: openSearchPanel },

@@ -1,4 +1,5 @@
 import katex from 'katex';
+import { imageParagraphParts } from '../imageLayout';
 import { semanticText, type DocumentNode } from '../model';
 import type { ExportRequest } from './ExportAdapter';
 import { manuscriptFonts, manuscriptIdentity, manuscriptLayout, proseIndent } from './ManuscriptLayout';
@@ -40,6 +41,8 @@ export async function renderPdfManuscript(request: ExportRequest, mathCss: strin
         return `<h${level} ${id}${node === identity.titleNode ? ' class="document-title"' : ''}>${(await children('inline')).trim()}</h${level}>`;
       }
       case 'paragraph': {
+        const parts = imageParagraphParts(node);
+        if (parts) return (await Promise.all(parts.map(part => part.kind === 'image' ? renderImage(part, true) : render(part, context)))).join('');
         const figure = node.children.find(child => child.kind === 'image');
         if (node.checked === undefined && figure && node.children.every(child => child === figure || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim())) return renderImage(figure, true);
         const mathOnly = node.children.every(child => child.kind === 'math' || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim());

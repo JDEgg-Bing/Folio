@@ -1,4 +1,4 @@
-import { Facet, StateField } from '@codemirror/state';
+import { Facet, StateField, StateEffect, RangeSetBuilder, RangeValue } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import katex from 'katex';
 import { semanticText, walkNodes, type DocumentModel, type DocumentNode } from '../../../document/model';
@@ -14,6 +14,19 @@ export interface PreviewEnvironment {
 }
 export const previewEnvironment = Facet.define<PreviewEnvironment, PreviewEnvironment>({ combine: values => values.at(-1) ?? { features: { ...DEFAULT_DOCUMENT_FEATURES }, resolveImage: async () => { throw new Error('图片服务不可用。'); }, jump: () => {} } });
 const mathCache = new Map<string, string | Error>();
+class ImageAtomicRange extends RangeValue {}
+const imageHeightEffect = StateEffect.define<{ id: string; height: number }>();
+const imageHeights = StateField.define<ReadonlyMap<string, number>>({
+  create: () => new Map(),
+  update: (value, tr) => {
+    const effects = tr.effects.filter(effect => effect.is(imageHeightEffect));
+    if (!tr.docChanged && !effects.length) return value;
+    const ids = new Set(tr.state.field(structureField).images.map(node => node.id));
+    const next = new Map([...value].filter(([id]) => ids.has(id)));
+    for (const effect of effects) if (ids.has(effect.value.id)) next.set(effect.value.id, effect.value.height);
+    return next;
+  }
+});
 export function renderMath(latex: string, display: boolean): string {
   const key = `${display}:${latex}`;
   const cached = mathCache.get(key); if (cached instanceof Error) throw cached; if (cached) return cached;
@@ -38,25 +51,39 @@ function equation(node: DocumentNode, label: string | null): HTMLElement {
   if (label) { const number = document.createElement('span'); number.className = 'document-equation-number'; number.textContent = label; element.append(number); }
   return element;
 }
-function image(node: DocumentNode, environment: PreviewEnvironment, view: EditorView, block: boolean, label: string | null, cleanups: (() => void)[]): HTMLElement {
+function image(node: DocumentNode, environment: PreviewEnvironment, view: EditorView, block: boolean, label: string | null, cleanups: (() => void)[], measuredHeight = -1): HTMLElement {
   const figure = document.createElement(block ? 'figure' : 'span'); figure.className = block ? 'document-figure' : 'document-image-inline';
-  const placeholder = document.createElement('span'); placeholder.className = 'document-preview-error'; placeholder.textContent = '正在加载图片…'; figure.append(placeholder);
+  if (block && measuredHeight > 0) figure.style.minHeight = `${measuredHeight}px`;
+  const picture = document.createElement('span'); picture.className = 'document-image-picture'; figure.append(picture);
+  const placeholder = document.createElement('span'); placeholder.className = 'document-preview-error'; placeholder.textContent = '正在加载图片…'; picture.append(placeholder);
   let disposed = false; cleanups.push(() => { disposed = true; });
+  // The editor content can keep the same min-height while an image grows. Feed
+  // the measured block height back into decorations so its height map changes
+  // even when a plain requestMeasure would skip content measurement.
+  if (block) {
+    const observer = new ResizeObserver(() => view.requestMeasure({ key: figure,
+      read: () => figure.getBoundingClientRect().height / view.scaleY,
+      write: height => queueMicrotask(() => {
+        if (!disposed && height > 0 && Math.abs((view.state.field(imageHeights).get(node.id) ?? -1) - height) > 0.5) view.dispatch({ effects: imageHeightEffect.of({ id: node.id, height }) });
+      })
+    }));
+    observer.observe(figure); cleanups.push(() => observer.disconnect());
+  }
   if (!node.destination) placeholder.textContent = '未找到图片路径。';
   else if (/^[a-z][a-z\d+.-]*:/i.test(node.destination) && !/^file:/i.test(node.destination) && !/^[a-z]:[\\/]/i.test(node.destination)) placeholder.textContent = `${node.sourceText ?? ''}（暂不显示网络图片）`;
   else environment.resolveImage(node.destination).then(resource => {
     if (disposed) return;
     const img = document.createElement('img'); img.alt = node.text ?? ''; img.src = resource.url;
-    img.addEventListener('load', () => { if (!disposed) view.requestMeasure(); });
-    img.addEventListener('error', () => { if (!disposed) { placeholder.textContent = '图片无法显示。'; img.replaceWith(placeholder); view.requestMeasure(); } });
+    img.addEventListener('load', () => { if (!disposed) { figure.style.minHeight = ''; view.requestMeasure(); } });
+    img.addEventListener('error', () => { if (!disposed) { figure.style.minHeight = ''; placeholder.textContent = '图片无法显示。'; img.replaceWith(placeholder); view.requestMeasure(); } });
     placeholder.replaceWith(img); view.requestMeasure();
     if (environment.cropImage) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'document-image-crop';
       button.textContent = '裁剪'; button.setAttribute('aria-label', '裁剪图片'); button.title = '裁剪并保留原图';
       button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); environment.cropImage!(node); });
-      figure.append(button); view.requestMeasure();
+      picture.append(button); view.requestMeasure();
     }
-  }).catch(cause => { if (!disposed) { placeholder.textContent = cause instanceof Error && /^[\u4e00-\u9fff]/.test(cause.message) ? cause.message : '图片无法显示。'; view.requestMeasure(); } });
+  }).catch(cause => { if (!disposed) { figure.style.minHeight = ''; placeholder.textContent = cause instanceof Error && /^[\u4e00-\u9fff]/.test(cause.message) ? cause.message : '图片无法显示。'; view.requestMeasure(); } });
   if (label) { const caption = document.createElement(block ? 'figcaption' : 'span'); caption.className = 'document-caption'; caption.textContent = `${label}${node.text ? `　${node.text}` : ''}`; figure.append(caption); }
   return figure;
 }
@@ -79,9 +106,10 @@ function inline(node: DocumentNode, environment: PreviewEnvironment, model: Docu
 }
 class DocumentWidget extends WidgetType {
   private cleanups: (() => void)[] = [];
-  constructor(readonly node: DocumentNode, readonly model: DocumentModel, readonly environment: PreviewEnvironment, readonly block: boolean, readonly editPosition: number) { super(); }
+  constructor(readonly node: DocumentNode, readonly model: DocumentModel, readonly environment: PreviewEnvironment, readonly block: boolean, readonly editPosition: number, readonly height = -1) { super(); }
+  override get estimatedHeight() { return this.height; }
   override eq(other: DocumentWidget): boolean {
-    if (other.node.id !== this.node.id || other.editPosition !== this.editPosition || other.environment !== this.environment || targetLabel(other.model, other.node) !== targetLabel(this.model, this.node)) return false;
+    if (other.height !== this.height || other.block !== this.block || other.node.id !== this.node.id || other.editPosition !== this.editPosition || other.environment !== this.environment || targetLabel(other.model, other.node) !== targetLabel(this.model, this.node)) return false;
     if (this.node.kind === 'reference' || this.node.kind === 'table') {
       const signature = (model: DocumentModel) => model.references.map(ref => `${ref.from}:${ref.status}:${ref.target?.from}:${ref.target?.label}`).join('|');
       return signature(other.model) === signature(this.model);
@@ -92,7 +120,7 @@ class DocumentWidget extends WidgetType {
     let element: HTMLElement;
     const label = targetLabel(this.model, this.node);
     if (this.node.kind === 'math') element = equation(this.node, label);
-    else if (this.node.kind === 'image') element = image(this.node, this.environment, view, this.block, label, this.cleanups);
+    else if (this.node.kind === 'image') element = image(this.node, this.environment, view, this.block, label, this.cleanups, this.height);
     else if (this.node.kind === 'reference') {
       const relation = this.model.references.find(ref => ref.from === this.node.from)!;
       element = document.createElement('button'); element.className = 'document-reference';
@@ -115,6 +143,7 @@ class DocumentWidget extends WidgetType {
     }
     element.title = '点击编辑源码'; element.addEventListener('click', event => {
       if (event.defaultPrevented || event.detail > 1 || !view.state.selection.main.empty) return;
+      if (this.node.kind === 'image' && !(event.target instanceof HTMLImageElement)) return;
       view.dispatch({ selection: { anchor: this.editPosition } }); view.focus();
     });
     return element;
@@ -141,7 +170,13 @@ export const documentPreviewField = StateField.define<DecorationSet>({
     if (transaction.state.field(composingField)) return value.map(transaction.changes);
     return transaction.docChanged || transaction.selection || transaction.effects.length || transaction.startState.field(structureField) !== transaction.state.field(structureField) || transaction.startState.facet(previewEnvironment) !== transaction.state.facet(previewEnvironment) ? buildDocumentPreview(transaction.state) : value;
   },
-  provide: field => EditorView.decorations.from(field)
+  provide: field => [imageHeights, EditorView.decorations.from(field), EditorView.atomicRanges.of(view => {
+    const ranges = new RangeSetBuilder<RangeValue>();
+    view.state.field(field).between(0, view.state.doc.length, (from, to, decoration) => {
+      if (decoration.spec.widget instanceof DocumentWidget && decoration.spec.widget.node.kind === 'image') ranges.add(from, to, new ImageAtomicRange());
+    });
+    return ranges.finish();
+  })]
 });
 export function buildDocumentPreview(state: import('@codemirror/state').EditorState): DecorationSet {
   if (state.field(composingField)) return Decoration.none;
@@ -158,13 +193,11 @@ export function buildDocumentPreview(state: import('@codemirror/state').EditorSt
     }
     const enabled = node.kind === 'math' ? environment.features.mathPreview : node.kind === 'image' ? environment.features.imagePreview : node.kind === 'table' ? environment.features.tablePreview : environment.features.referencePreview;
     if (!enabled || active(node.from, node.attribute?.to ?? node.to)) continue;
-    const parent = node.parentId && parents.get(node.parentId);
-    const standaloneImage = node.kind === 'image' && parent && parent.kind === 'paragraph' && parent.checked === undefined && parent.children.every(child => child === node || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim());
-    const block = node.kind === 'table' || node.kind === 'math' && !!node.display || !!standaloneImage;
-    const from = standaloneImage ? parent.from : node.from;
-    const to = standaloneImage ? parent.to : block && environment.features.referencePreview ? node.attribute?.to ?? node.to : node.to;
+    const block = node.kind === 'table' || node.kind === 'math' && !!node.display || node.kind === 'image' && node.imageLayout === 'block';
+    const from = node.from;
+    const to = node.kind !== 'image' && block && environment.features.referencePreview ? node.attribute?.to ?? node.to : node.to;
     covered.push({ from, to });
-    decorations.push(Decoration.replace({ block, widget: new DocumentWidget(node, model, environment, block, node.from) }).range(from, to));
+    decorations.push(Decoration.replace({ block, widget: new DocumentWidget(node, model, environment, block, node.from, node.kind === 'image' && block ? state.field(imageHeights).get(node.id) ?? -1 : -1) }).range(from, to));
   }
   return Decoration.set(decorations, true);
 }

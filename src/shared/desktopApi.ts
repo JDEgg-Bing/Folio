@@ -55,6 +55,7 @@ export interface DesktopAPI {
   readImageForCrop(handleId: string | null, destination: string): Promise<string>;
   importCroppedImage(handleId: string, dataUrl: string): Promise<string>;
   onImageDrop(listener: (drop: ImageDrop) => void): () => void;
+  onImagePaste(listener: (paste: ImageDrop) => void): () => void;
   setDocumentFeatures(features: Record<string, boolean>): void;
   onCommand(listener: (command: string) => void): () => void;
   confirmUnsavedChanges(): Promise<'save' | 'discard' | 'cancel'>;
@@ -63,4 +64,4 @@ export interface DesktopAPI {
   onRequestClose(listener: () => void): () => void;
   showMessage(message: string): void;
 }
-export interface ImageDrop { id: string; phase: 'start' | 'ready'; x: number; y: number; tickets: string[]; error?: string }
+export interface ImageDrop { id: string; phase: 'start' | 'ready'; x?: number; y?: number; replaceSelection?: boolean; tickets: string[]; error?: string }

@@ -1,6 +1,8 @@
 # Folio · 轻页 — 当前状态
 
-当前维护版本：**1.2.1**。显示名 Folio，中文名轻页。当前交付使用完整中文 Inno 向导，AppId 为 `Folio.Desktop`；默认数据目录继续为 `Markdown Editor`。历史 Squirrel 构建标识 `markdown_editor_v1` 保留，实际旧 1.0.0 迁移尚未验证。
+当前维护版本：**1.2.2**。显示名 Folio，中文名轻页。当前交付使用完整中文 Inno 向导，AppId 为 `Folio.Desktop`；默认数据目录继续为 `Markdown Editor`。历史 Squirrel 构建标识 `markdown_editor_v1` 保留，实际旧 1.0.0 迁移尚未验证。
+
+1.2.2 修复图片加载后的相邻文字命中和上下方向键布局跳动；图片独占一行即可完整预览，下一行可紧接文字。支持截图、复制图片和 Windows 资源管理器单张／多张图片粘贴，沿用 assets 管理、异步选区、保存与撤销保护。预览和 PDF／DOCX 共用图片行布局标记，具体测试与文件职责见[维护记录](EDITOR_MAINTENANCE.md)。
 
 已实现：Markdown 编辑和实时预览、原子保存与未保存保护、增量字数、明暗主题与强调色、中英文排版、虚拟目录、离线公式、本地图片与托管附件、GFM 表格、内部引用、正式文稿 PDF／DOCX、Word 模板识别／确认／复用／重新识别。
 
