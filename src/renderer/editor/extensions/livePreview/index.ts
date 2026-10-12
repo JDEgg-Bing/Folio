@@ -1,6 +1,41 @@
 import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
-import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view';
+import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from '@codemirror/view';
+import { previewSelection } from '../../previewSelection';
+
+class BulletWidget extends WidgetType {
+  override eq(other: WidgetType) { return other instanceof BulletWidget; }
+  override toDOM() {
+    const marker = document.createElement('span');
+    marker.className = 'cm-preview-bullet'; marker.textContent = '•';
+    marker.setAttribute('aria-hidden', 'true');
+    return marker;
+  }
+  override ignoreEvent() { return false; }
+}
+
+export class TaskCheckboxWidget extends WidgetType {
+  constructor(readonly position: number, readonly checked: boolean) { super(); }
+  override eq(other: WidgetType) { return other instanceof TaskCheckboxWidget && other.position === this.position && other.checked === this.checked; }
+  override toDOM(view: EditorView) {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox'; checkbox.className = 'cm-preview-task'; checkbox.checked = this.checked;
+    checkbox.setAttribute('aria-label', this.checked ? '标记为未完成' : '标记为完成');
+    // Only this control handles its own events; the item text stays native text.
+    checkbox.addEventListener('mousedown', event => event.preventDefault());
+    checkbox.addEventListener('change', () => {
+      const marker = view.state.doc.sliceString(this.position, this.position + 3);
+      if (!/^\[[ xX]\]$/.test(marker) || view.state.readOnly) { checkbox.checked = this.checked; return; }
+      view.dispatch({ changes: { from: this.position + 1, to: this.position + 2, insert: checkbox.checked ? 'x' : ' ' }, userEvent: 'input.task' });
+      view.focus();
+    });
+    checkbox.disabled = view.state.readOnly;
+    return checkbox;
+  }
+  override ignoreEvent() { return true; }
+}
+
+const bullet = new BulletWidget();
 
 const headingClasses = ['cm-preview-h1', 'cm-preview-h2', 'cm-preview-h3', 'cm-preview-h4', 'cm-preview-h5', 'cm-preview-h6'];
 const hiddenDelimiter = Decoration.replace({});
@@ -17,7 +52,7 @@ export interface VisibleRange { from: number; to: number }
 export function buildDecorations(
   state: EditorState,
   visibleRanges: readonly VisibleRange[],
-  activeLine = state.doc.lineAt(state.selection.main.head).number
+  activeLine = state.doc.lineAt(previewSelection(state).main.head).number
 ): DecorationSet {
   const ranges = [] as ReturnType<Decoration['range']>[];
   const seen = new Set<string>();
@@ -28,6 +63,19 @@ export function buildDecorations(
       const key = `${node.name}:${node.from}:${node.to}`;
       if (seen.has(key)) return;
       seen.add(key);
+
+      if (node.name === 'TaskMarker' && state.doc.lineAt(node.from).number !== activeLine) {
+        ranges.push(Decoration.replace({ widget: new TaskCheckboxWidget(node.from, /[xX]/.test(state.doc.sliceString(node.from, node.to))) }).range(node.from, node.to));
+      }
+      if (node.name === 'ListMark' && state.doc.lineAt(node.from).number !== activeLine) {
+        const item = node.node.parent;
+        const task = item?.getChild('Task');
+        const inlineTask = task && state.doc.lineAt(task.from).number === state.doc.lineAt(node.from).number;
+        // An ordered task retains its number. Bullet tasks show one checkbox.
+        if (item?.parent?.name === 'BulletList') {
+          ranges.push((inlineTask ? hiddenDelimiter : Decoration.replace({ widget: bullet })).range(node.from, inlineTask ? task.from : node.to));
+        }
+      }
 
       if (node.name === 'HorizontalRule' && state.doc.lineAt(node.from).number !== activeLine) {
         ranges.push(Decoration.line({ class: 'cm-writing-rule' }).range(state.doc.lineAt(node.from).from));

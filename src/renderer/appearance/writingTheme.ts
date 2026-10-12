@@ -2,6 +2,7 @@ import { defaultHighlightStyle, HighlightStyle, syntaxTree } from '@codemirror/l
 import { tags } from '@lezer/highlight';
 import type { EditorState } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view';
+import { previewSelection } from '../editor/previewSelection';
 
 // Remove renderer-like heading styling at its source, including setext H1/H2.
 export const writingHighlightStyle = HighlightStyle.define([...defaultHighlightStyle.specs.map((style) =>
@@ -22,7 +23,7 @@ const headingStyles = Object.fromEntries(Array.from({ length: 6 }, (_, index) =>
 export function documentPresentation(state: EditorState, visibleRanges: readonly { from: number; to: number }[]) {
   const classes = new Map<number, Set<string>>();
   const codeLines = new Set<number>();
-  const active = state.doc.lineAt(state.selection.main.head).number;
+  const active = state.doc.lineAt(previewSelection(state).main.head).number;
   const add = (line: number, name: string) => {
     if (!classes.has(line)) classes.set(line, new Set());
     classes.get(line)!.add(name);

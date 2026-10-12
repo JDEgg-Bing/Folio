@@ -61,7 +61,7 @@ Update with a new installer. Uninstalling retains documents, image attachments, 
 ## Start in three steps
 
 1. Create or open a `.md` / `.markdown` file and write Markdown.
-2. Save with **Ctrl+S**. When sharing a document with managed images, include its matching `.assets` folder.
+2. Save with **Ctrl+S**. When sharing a document with managed images, include its `assets` folder; older documents still need any `.assets` folder they reference.
 3. Export PDF or Word from the File menu, choose a layout and review the result.
 
 Useful shortcuts: **Ctrl+O** open · **Ctrl+F** find/replace · **Ctrl+Shift+O** outline · **F1** guide.

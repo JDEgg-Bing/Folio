@@ -13,11 +13,13 @@ import { livePreview } from './extensions/livePreview';
 import { writingHighlightStyle, writingTheme } from '../appearance/writingTheme';
 import { documentTitle, documentTitleField } from '../document/DocumentTitle';
 import { wordCountField } from './wordCount';
+import { previewSelectionField } from './previewSelection';
 
 export function createEditorExtensions(onUpdate: (snapshot: EditorSnapshot) => void) {
   return [
     writingTheme,
     history(),
+    previewSelectionField,
     markdown({ base: markdownLanguage, extensions: [GFM, documentSyntax] }),
     documentStructure,
     EditorState.phrases.of(chinesePhrases),

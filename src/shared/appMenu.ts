@@ -30,7 +30,7 @@ export const APP_MENUS: readonly AppMenu[] = [
     role('undo', '撤销', 'CmdOrCtrl+Z', 'Ctrl Z'), role('redo', '重做', 'CmdOrCtrl+Y', 'Ctrl Y'), separator,
     role('cut', '剪切', 'CmdOrCtrl+X', 'Ctrl X'), role('copy', '复制', 'CmdOrCtrl+C', 'Ctrl C'),
     role('paste', '粘贴', 'CmdOrCtrl+V', 'Ctrl V'), role('selectAll', '全选', 'CmdOrCtrl+A', 'Ctrl A'), separator,
-    item('find', '查找 / 替换', 'CmdOrCtrl+F', 'Ctrl F')
+    item('find', '查找 / 替换', 'CmdOrCtrl+F', 'Ctrl F'), separator, item('insert-image', '插入图片…')
   ] },
   { id: 'view', label: '视图', entries: [
     toggle('outlineVisible', '文档目录', 'CmdOrCtrl+Shift+O', 'Ctrl Shift O'),

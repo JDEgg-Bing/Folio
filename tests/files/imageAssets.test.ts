@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, rename } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ImageAssetService, resolveImagePath } from '../../src/main/assets/ImageAssetService';
@@ -22,12 +23,12 @@ describe('image resources and document attachments', () => {
   });
   it('imports to a managed folder with relative paths, content deduplication and manifest', async () => {
     const f = await fixture(), ids = await f.service.stage([f.image]), images = await f.service.import(f.document,ids);
-    expect(images[0].destination).toMatch(/^论文\.assets\/[a-f0-9]+\.png$/);
+    expect(images[0].destination).toMatch(/^assets\/[a-f0-9]+\.png$/);
     expect(images[0].alt).toBe('示意 图');
     expect(await readFile(join(f.folder,images[0].destination))).toEqual(png);
     await f.service.import(f.document,await f.service.stage([f.image]));
-    expect((await readdir(join(f.folder,'论文.assets'))).filter(name => name.endsWith('.png'))).toHaveLength(1);
-    expect(JSON.parse(await readFile(join(f.folder,'论文.assets','.markdown-editor-assets.json'),'utf8')).files).toHaveLength(1);
+    expect((await readdir(join(f.folder,'assets'))).filter(name => name.endsWith('.png'))).toHaveLength(1);
+    expect(JSON.parse(await readFile(join(f.folder,'assets','.markdown-editor-assets.json'),'utf8')).files).toHaveLength(1);
   });
   it('exposes opaque image resources and rejects unregistered IDs', async () => {
     const f = await fixture(), image = await f.service.resolve(null,f.image);
@@ -35,6 +36,39 @@ describe('image resources and document attachments', () => {
     expect((await f.service.resource(new URL(image.url).pathname.slice(1))).bytes).toEqual(png);
     await expect(f.service.resource('unknown')).rejects.toThrow('失效');
     f.service.releaseResources(); await expect(f.service.resource(new URL(image.url).pathname.slice(1))).rejects.toThrow('失效');
+  });
+  it('keeps Windows separators before parenthesized folders and accepts file URLs', () => {
+    if (process.platform !== 'win32') return;
+    const absolute = 'C:\\notes\\(draft)\\图 1.png';
+    expect(resolveImagePath(null, absolute)).toBe(absolute);
+    expect(resolveImagePath(null, pathToFileURL(absolute).href)).toBe(absolute);
+    expect(resolveImagePath('C:\\notes\\paper.md', 'assets\\image.png')).toBe('C:\\notes\\assets\\image.png');
+    expect(resolveImagePath(null, '\\\\server\\share\\(draft)\\图.png')).toBe('\\\\server\\share\\(draft)\\图.png');
+  });
+  it('resolves saved links in a new session and still migrates legacy .assets attachments', async () => {
+    const f = await fixture(), [image] = await f.service.import(f.document, await f.service.stage([f.image]));
+    await rename(join(f.folder, 'assets'), join(f.folder, '论文.assets'));
+    const legacy = image.destination.replace('assets/', '论文.assets/');
+    const source = `![图](<${legacy}>)`;
+    await writeFile(f.document, source);
+    const reopened = new ImageAssetService();
+    const resource = await reopened.resolve(f.document, legacy);
+    expect((await reopened.resource(new URL(resource.url).pathname.slice(1))).bytes).toEqual(png);
+    const next = join(f.folder, 'next'); await mkdir(next);
+    await reopened.copyForSaveAs(f.document, join(next, 'copy.md'), await readFile(f.document, 'utf8'));
+    expect(await readFile(join(next, legacy))).toEqual(png);
+    expect(await readFile(f.document, 'utf8')).toBe(source);
+  });
+  it('serializes overlapping imports without losing manifest entries and recovers after failure', async () => {
+    const f = await fixture(), svg = join(f.folder, 'different.svg');
+    await writeFile(svg, '<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const a = await f.service.stage([f.image]), b = await f.service.stage([svg]);
+    await expect(f.service.import(f.document, ['invalid'])).rejects.toThrow();
+    const [first, second] = await Promise.all([f.service.import(f.document, a), f.service.import(f.document, b)]);
+    const manifest = JSON.parse(await readFile(join(f.folder, 'assets', '.markdown-editor-assets.json'), 'utf8'));
+    expect(manifest.files).toHaveLength(2);
+    expect(await readFile(join(f.folder, first[0].destination))).toEqual(png);
+    expect(await readFile(join(f.folder, second[0].destination), 'utf8')).toContain('<svg');
   });
   it('copies only referenced managed assets across directories while leaving source unchanged', async () => {
     const f = await fixture(), images = await f.service.import(f.document,await f.service.stage([f.image]));
@@ -58,13 +92,13 @@ describe('image resources and document attachments', () => {
   });
   it('does not overwrite conflicting destination assets', async () => {
     const f = await fixture(), images = await f.service.import(f.document,await f.service.stage([f.image]));
-    const next = join(f.folder,'new'); await mkdir(join(next,'论文.assets'),{recursive:true});
+    const next = join(f.folder,'new'); await mkdir(join(next,'assets'),{recursive:true});
     const target = join(next,images[0].destination); await writeFile(target,'original');
     await expect(f.service.copyForSaveAs(f.document,join(next,'copy.md'),`![图](<${images[0].destination}>)`)).rejects.toThrow('同名文件');
     expect(await readFile(target,'utf8')).toBe('original');
   });
   it('preserves a damaged manifest rather than overwriting unknown resources', async () => {
-    const f = await fixture(), folder = join(f.folder,'论文.assets'); await mkdir(folder);
+    const f = await fixture(), folder = join(f.folder,'assets'); await mkdir(folder);
     const manifest = join(folder,'.markdown-editor-assets.json'); await writeFile(manifest,'broken');
     await expect(f.service.import(f.document, await f.service.stage([f.image]))).rejects.toThrow('清单无效');
     expect(await readFile(manifest,'utf8')).toBe('broken'); expect(await readdir(folder)).toEqual(['.markdown-editor-assets.json']);
@@ -72,14 +106,14 @@ describe('image resources and document attachments', () => {
   it('rolls back a partial multi-file import and leaves existing attachments intact', async () => {
     const f = await fixture(), original = await f.service.import(f.document,await f.service.stage([f.image]));
     const svg = join(f.folder,'new.svg'); await writeFile(svg,'<svg xmlns="http://www.w3.org/2000/svg"/>');
-    const folder = join(f.folder,'论文.assets'), before = await readdir(folder), manifest = await readFile(join(folder,'.markdown-editor-assets.json'),'utf8');
+    const folder = join(f.folder,'assets'), before = await readdir(folder), manifest = await readFile(join(folder,'.markdown-editor-assets.json'),'utf8');
     await expect(f.service.import(f.document,[...await f.service.stage([svg]),'invalid'])).rejects.toThrow('失效');
     expect(await readdir(folder)).toEqual(before); expect(await readFile(join(folder,'.markdown-editor-assets.json'),'utf8')).toBe(manifest);
     expect(await readFile(join(f.folder,original[0].destination))).toEqual(png);
   });
   it('does not overwrite an invalid destination manifest during Save As', async () => {
     const f = await fixture(), images = await f.service.import(f.document,await f.service.stage([f.image]));
-    const next = join(f.folder,'new'), folder = join(next,'论文.assets'); await mkdir(folder,{recursive:true});
+    const next = join(f.folder,'new'), folder = join(next,'assets'); await mkdir(folder,{recursive:true});
     const manifest = join(folder,'.markdown-editor-assets.json'); await writeFile(manifest,'unknown');
     await expect(f.service.copyForSaveAs(f.document,join(next,'copy.md'),`![图](<${images[0].destination}>)`)).rejects.toThrow('清单无效');
     expect(await readFile(manifest,'utf8')).toBe('unknown'); expect(await readdir(folder)).toEqual(['.markdown-editor-assets.json']);
@@ -88,7 +122,7 @@ describe('image resources and document attachments', () => {
     const f = await fixture(), damaged = join(f.folder,'bad.png'); await writeFile(damaged,'not png');
     await expect(f.service.stage([damaged])).rejects.toThrow('损坏');
     await expect(f.service.import(f.document,['unknown'])).rejects.toThrow('失效');
-    expect(await readdir(join(f.folder,'论文.assets')).catch(() => [])).toEqual([]);
+    expect(await readdir(join(f.folder,'assets')).catch(() => [])).toEqual([]);
     const text = join(f.folder,'file.txt'); await writeFile(text,'text'); await expect(f.service.stage([text])).rejects.toThrow('格式');
   });
 });

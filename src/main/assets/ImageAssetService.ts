@@ -13,7 +13,9 @@ interface Manifest { version: 1; files: AssetEntry[] }
 export interface AssetTransaction { created: string[]; rollback(): Promise<void> }
 export interface ImportedImage { destination: string; alt: string }
 export function resolveImagePath(documentPath: string | null, destination: string): string {
-  let path = destination.replace(/\\([ ()\[\]])/g, '$1');
+  // Backslashes in an absolute Windows/UNC path are separators, including
+  // before a parenthesized folder name, rather than Markdown escapes.
+  let path = /^(?:[a-z]:[\\/]|\\\\)/i.test(destination) ? destination : destination.replace(/\\([ ()\[\]])/g, '$1');
   try { path = decodeURIComponent(path); } catch { /* Literal percent in a local filename. */ }
   if (/^file:/i.test(path)) return fileURLToPath(path);
   if (/^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path)) throw new Error('暂不显示网络图片。');
@@ -55,6 +57,7 @@ function transaction(created: string[], folders: string[], restorations: (() => 
   } };
 }
 export class ImageAssetService {
+  private importQueue: Promise<unknown> = Promise.resolve();
   private resources = new Map<string, string>();
   private resourceIds = new Map<string, string>();
   private tickets = new Map<string, { path: string; expires: number }>();
@@ -74,7 +77,13 @@ export class ImageAssetService {
   }
   releaseResources() { this.resources.clear(); this.resourceIds.clear(); }
   async import(documentPath: string, ids: string[]): Promise<ImportedImage[]> {
-    const folder = join(dirname(documentPath), `${basename(documentPath, extname(documentPath))}.assets`);
+    // Menu and drop imports can overlap. Serialize manifest read/modify/write.
+    const operation = this.importQueue.catch(() => {}).then(() => this.importFiles(documentPath, ids));
+    this.importQueue = operation;
+    return operation;
+  }
+  private async importFiles(documentPath: string, ids: string[]): Promise<ImportedImage[]> {
+    const folder = join(dirname(documentPath), 'assets');
     const created: string[] = [], folders: string[] = [], restores: (() => Promise<void>)[] = [];
     const tx = transaction(created, folders, restores);
     const oldManifest = await readManifest(folder);

@@ -115,7 +115,7 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
       default: return n.text !== undefined ? run(n.sourceType === 'HardBreak' ? '\n' : n.text, props) : children();
     }
   }
-  type Context = { quote?: number; list?: number; depth?: number; first?: boolean };
+  type Context = { quote?: number; list?: number; depth?: number; first?: boolean; ordered?: boolean };
   async function blocks(n: DocumentNode, ctx: Context = {}): Promise<string> {
     const result = await renderBlock(n, ctx);
     return n.kind === 'image' || n.kind === 'math' && !n.display ? result : bookmarked(n, result);
@@ -124,7 +124,7 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
     signal.throwIfAborted();
     const children = async (context = ctx) => { let result = ''; for (const child of n.children) result += await blocks(child, context); return result; };
     const indent = ptToTwips(a.quoteIndent * (ctx.quote ?? 0) + (ctx.list ? a.listIndent * ((ctx.depth ?? 0) + 1) : 0));
-    const contextProps = `${indent ? `<w:ind w:left="${indent}"/>` : ''}${ctx.quote ? '<w:pStyle w:val="Quote"/><w:pBdr><w:left w:val="single" w:sz="4" w:space="8" w:color="BBBBBB"/></w:pBdr>' : ''}${ctx.list ? '<w:spacing w:after="40"/>' : ''}${ctx.list && ctx.first ? `<w:numPr><w:ilvl w:val="${ctx.depth ?? 0}"/><w:numId w:val="${ctx.list}"/></w:numPr>` : ''}`;
+    const contextProps = `${indent ? `<w:ind w:left="${indent}"/>` : ''}${ctx.quote ? '<w:pStyle w:val="Quote"/><w:pBdr><w:left w:val="single" w:sz="4" w:space="8" w:color="BBBBBB"/></w:pBdr>' : ''}${ctx.list ? '<w:spacing w:after="40"/>' : ''}${ctx.list && ctx.first && (n.checked === undefined || ctx.ordered) ? `<w:numPr><w:ilvl w:val="${ctx.depth ?? 0}"/><w:numId w:val="${ctx.list}"/></w:numPr>` : ''}`;
     switch (n.kind) {
       case 'document': return children();
       case 'attribute': return '';
@@ -132,17 +132,17 @@ export async function renderDocx(request: ExportRequest, media: DocxMedia): Prom
       case 'heading': return p(await inline(n), `<w:pStyle w:val="${n === titleNode ? 'Title' : `Heading${n.level ?? 1}`}"/>`);
       case 'paragraph': {
         const fig = n.children.find(c => c.kind === 'image');
-        if (fig && n.children.every(c => c === fig || c.kind === 'attribute' || c.kind === 'text' && !c.text?.trim())) return image(fig, true);
+        if (n.checked === undefined && fig && n.children.every(c => c === fig || c.kind === 'attribute' || c.kind === 'text' && !c.text?.trim())) return image(fig, true);
         const mathOnly = n.children.every(c => c.kind === 'math' || c.kind === 'attribute' || c.kind === 'text' && !c.text?.trim());
         if (request.template && /^(?:图\s*\d|表\s*\d|图\s*[:：]|表\s*[:：]|Figure\s+\d|Table\s+\d)/i.test(semanticText(n))) return p(await inline(n), `<w:pStyle w:val="${/^(?:表|Table)/i.test(semanticText(n)) ? 'TableCaption' : 'FigureCaption'}"/>`);
-        return p(await inline(n), contextProps + (!ctx.quote && !ctx.list && !fig && !mathOnly ? `<w:jc w:val="${a.body.align === 'justify' ? 'both' : 'left'}"/><w:ind w:firstLine="${ptToTwips(a.body.size * proseIndent(n, a))}"/>` : '<w:jc w:val="left"/>'));
+        return p((n.checked === undefined ? '' : run(n.checked ? '☑' : '☐')) + await inline(n), contextProps + (!ctx.quote && !ctx.list && !fig && !mathOnly ? `<w:jc w:val="${a.body.align === 'justify' ? 'both' : 'left'}"/><w:ind w:firstLine="${ptToTwips(a.body.size * proseIndent(n, a))}"/>` : '<w:jc w:val="left"/>'));
       }
       case 'quote': return children({ ...ctx, quote: (ctx.quote ?? 0) + 1 });
       case 'list': {
         const id = numbering.length + 1;
         const levels = Array.from({ length: 9 }, (_, i) => `<w:lvl w:ilvl="${i}"><w:start w:val="${n.start ?? 1}"/><w:numFmt w:val="${n.ordered ? 'decimal' : 'bullet'}"/><w:lvlText w:val="${n.ordered ? `%${i + 1}.` : '•'}"/><w:lvlJc w:val="left"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="${ptToTwips(a.listIndent * (i + 1))}"/></w:tabs><w:ind w:left="${ptToTwips(a.listIndent * (i + 1))}" w:hanging="240"/></w:pPr></w:lvl>`).join('');
         numbering.push({ abstract: `<w:abstractNum w:abstractNumId="${id}"><w:multiLevelType w:val="multilevel"/>${levels}</w:abstractNum>`, instance: `<w:num w:numId="${id}"><w:abstractNumId w:val="${id}"/></w:num>` });
-        return children({ ...ctx, list: id, depth: Math.min(8, ctx.list ? (ctx.depth ?? 0) + 1 : 0) });
+        return children({ ...ctx, list: id, ordered: n.ordered, depth: Math.min(8, ctx.list ? (ctx.depth ?? 0) + 1 : 0) });
       }
       case 'listItem': { let out = '', first = true; for (const child of n.children) { out += await blocks(child, { ...ctx, first: first && child.kind !== 'list' }); if (child.kind !== 'list' && child.kind !== 'attribute') first = false; } return out; }
       case 'code': { const raw = n.text ?? ''; const text = /^\s*(`{3,}|~{3,})/.test(raw) ? raw.replace(/^\s*(`{3,}|~{3,})[^\n]*\n?/, '').replace(/\n?\s*(`{3,}|~{3,})\s*$/, '') : raw.replace(/^ {4}/gm, ''); return p(run(text), contextProps.replace('<w:pStyle w:val="Quote"/>', '') + '<w:pStyle w:val="CodeBlock"/><w:jc w:val="left"/>'); }

@@ -4,6 +4,7 @@ import katex from 'katex';
 import { semanticText, walkNodes, type DocumentModel, type DocumentNode } from '../../../document/model';
 import { DEFAULT_DOCUMENT_FEATURES, type DocumentFeatures } from '../../preferences/DocumentFeatures';
 import { composingField, structureField } from '../documentStructure';
+import { previewSelection } from '../previewSelection';
 
 export interface PreviewEnvironment {
   features: DocumentFeatures;
@@ -105,10 +106,17 @@ class DocumentWidget extends WidgetType {
         }); table.append(tr);
       }); scroll.append(table); element.append(scroll);
     }
-    element.title = '点击编辑源码'; element.addEventListener('click', () => { view.dispatch({ selection: { anchor: this.editPosition } }); view.focus(); });
+    element.title = '点击编辑源码'; element.addEventListener('click', event => {
+      if (event.defaultPrevented || event.detail > 1 || !view.state.selection.main.empty) return;
+      view.dispatch({ selection: { anchor: this.editPosition } }); view.focus();
+    });
     return element;
   }
-  override ignoreEvent() { return true; }
+  override ignoreEvent(event: Event) {
+    // Let CodeMirror handle pointer selection across replacement boundaries.
+    // Reference buttons retain their own navigation action.
+    return event.target instanceof Element && !!event.target.closest('button');
+  }
   override destroy() { for (const cleanup of this.cleanups) cleanup(); }
 }
 const indexCache = new WeakMap<DocumentModel, { nodes: DocumentNode[]; parents: Map<string, DocumentNode>; attributeOwners: Map<number, DocumentNode> }>();
@@ -132,7 +140,7 @@ export function buildDocumentPreview(state: import('@codemirror/state').EditorSt
   if (state.field(composingField)) return Decoration.none;
   const model = state.field(structureField), environment = state.facet(previewEnvironment), { nodes, parents, attributeOwners } = previewIndex(model);
   const decorations: ReturnType<Decoration['range']>[] = [], covered: { from: number; to: number }[] = [];
-  const active = (from: number, to: number) => state.selection.ranges.some(range => range.from <= to && range.to >= from);
+  const active = (from: number, to: number) => previewSelection(state).ranges.some(range => range.from <= to && range.to >= from);
   for (const node of nodes) {
     if (covered.some(range => node.from >= range.from && node.to <= range.to)) continue;
     if (node.kind === 'table' && active(node.from, node.attribute?.to ?? node.to)) { covered.push({ from: node.from, to: node.to }); continue; }
@@ -144,7 +152,7 @@ export function buildDocumentPreview(state: import('@codemirror/state').EditorSt
     const enabled = node.kind === 'math' ? environment.features.mathPreview : node.kind === 'image' ? environment.features.imagePreview : node.kind === 'table' ? environment.features.tablePreview : environment.features.referencePreview;
     if (!enabled || active(node.from, node.attribute?.to ?? node.to)) continue;
     const parent = node.parentId && parents.get(node.parentId);
-    const standaloneImage = node.kind === 'image' && parent && parent.kind === 'paragraph' && parent.children.every(child => child === node || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim());
+    const standaloneImage = node.kind === 'image' && parent && parent.kind === 'paragraph' && parent.checked === undefined && parent.children.every(child => child === node || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim());
     const block = node.kind === 'table' || node.kind === 'math' && !!node.display || !!standaloneImage;
     const from = standaloneImage ? parent.from : node.from;
     const to = standaloneImage ? parent.to : block && environment.features.referencePreview ? node.attribute?.to ?? node.to : node.to;

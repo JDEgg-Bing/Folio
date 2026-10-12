@@ -41,14 +41,14 @@ export async function renderPdfManuscript(request: ExportRequest, mathCss: strin
       }
       case 'paragraph': {
         const figure = node.children.find(child => child.kind === 'image');
-        if (figure && node.children.every(child => child === figure || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim())) return renderImage(figure, true);
+        if (node.checked === undefined && figure && node.children.every(child => child === figure || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim())) return renderImage(figure, true);
         const mathOnly = node.children.every(child => child.kind === 'math' || child.kind === 'attribute' || child.kind === 'text' && !child.text?.trim());
         const prose = context === 'body' && !figure && !mathOnly;
-        return `<p ${id} class="${prose ? 'prose' : 'plain'}"${prose ? ` style="text-indent:${proseIndent(node, layout)}em"` : ''}>${await children('inline')}</p>`;
+        return `<p ${id} class="${prose ? 'prose' : 'plain'}"${prose ? ` style="text-indent:${proseIndent(node, layout)}em"` : ''}>${node.checked === undefined ? '' : node.checked ? '☑' : '☐'}${await children('inline')}</p>`;
       }
       case 'quote': return `<blockquote ${id}>${await children('quote')}</blockquote>`;
       case 'list': return `<${node.ordered ? 'ol' : 'ul'} ${id}${node.ordered ? ` start="${node.start ?? 1}"` : ''}>${await children('list')}</${node.ordered ? 'ol' : 'ul'}>`;
-      case 'listItem': return `<li ${id}>${await children('list')}</li>`;
+      case 'listItem': return `<li ${id}${node.children[0]?.checked !== undefined ? ' class="task-list-item"' : ''}>${await children('list')}</li>`;
       case 'strong': return `<strong>${await children('inline')}</strong>`;
       case 'emphasis': return `<em>${await children('inline')}</em>`;
       case 'strike': return `<s>${await children('inline')}</s>`;
@@ -116,6 +116,7 @@ export async function renderPdfManuscript(request: ExportRequest, mathCss: strin
     h1.document-title{font-size:${layout.title.size}pt;margin:${layout.title.before}pt 0 ${layout.title.after}pt;text-align:center;color:#000}
     blockquote{margin:${layout.elementGap}pt 0 ${layout.elementGap}pt ${layout.quoteIndent}pt;padding-left:8pt;border-left:0.5pt solid #bbb;color:#555;text-align:left}
     ul,ol{padding-left:${layout.listIndent}pt;margin:0 0 ${layout.body.after}pt;text-align:left}
+    ul>li.task-list-item{list-style-type:none}
     li>p{margin-bottom:2pt}pre{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;background:#${layout.code.background};padding:${layout.code.padding}pt;margin:${layout.elementGap}pt 0;font-size:${layout.code.size}pt;line-height:${layout.code.lineHeight};orphans:2;widows:2;box-decoration-break:clone}
     code{font-family:"${layout.fonts.code}",monospace;font-size:0.9em}pre code{font-size:inherit}
     figure{margin:${layout.elementGap}pt 0;text-align:center;break-inside:avoid}
