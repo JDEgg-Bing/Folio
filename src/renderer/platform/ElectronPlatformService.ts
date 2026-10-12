@@ -32,6 +32,8 @@ export class ElectronPlatformService implements PlatformService {
   resolveImage(handleId: string | null, destination: string) { return this.api.resolveImage(handleId, destination); }
   importImages(handleId: string, tickets: string[]) { return this.api.importImages(handleId, tickets); }
   chooseImages() { return this.api.chooseImages(); }
+  readImageForCrop: PlatformService['readImageForCrop'] = (handle, destination) => this.api.readImageForCrop(handle, destination);
+  importCroppedImage: PlatformService['importCroppedImage'] = (handle, dataUrl) => this.api.importCroppedImage(handle, dataUrl);
   onImageDrop: PlatformService['onImageDrop'] = listener => this.api.onImageDrop(listener);
   setDocumentFeatures(features: Record<string, boolean>) { this.api.setDocumentFeatures(features); }
   showMessage(message: string) { this.api.showMessage(message); }

@@ -76,6 +76,17 @@ body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--ui-font-f
 .document-figure { margin: var(--writing-paragraph-spacing) 0; text-align: center; }
 .document-figure img { display: block; max-width: 100%; max-height: 70vh; height: auto; margin: 0 auto; }
 .document-image-inline img { max-width: 100%; max-height: 2em; vertical-align: middle; }
+.document-image-crop { display: inline-block; margin: 4px 0 4px 8px; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); font: 12px/1.5 var(--ui-font-family); cursor: pointer; vertical-align: middle; }
+.document-image-crop:hover { color: var(--accent); border-color: var(--accent); }
+.image-crop-dialog { width: min(760px, calc(100vw - 32px)); }
+.image-crop-body { overflow: auto; }
+.image-crop-preview { text-align: center; }
+.image-crop-stage { position: relative; display: inline-block; max-width: 100%; overflow: hidden; line-height: 0; cursor: crosshair; touch-action: none; user-select: none; }
+.image-crop-stage img { display: block; max-width: 100%; max-height: 38vh; width: auto; height: auto; }
+.image-crop-rectangle { position: absolute; box-sizing: border-box; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgb(0 0 0 / 45%); pointer-events: none; }
+.image-crop-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.image-crop-fields label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.image-crop-fields input { width: 100%; box-sizing: border-box; }
 .document-caption { font-size: var(--document-caption-size); text-align: center; margin: 0.25em 0; }
 .document-table-container { max-width: 100%; padding: var(--writing-paragraph-spacing) 0; }
 .document-table-scroll { overflow-x: auto; max-width: 100%; }

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parser, GFM } from '@lezer/markdown';
 import { documentSyntax } from '../../document/markdownSyntax';
 import { DocumentStructureService } from '../../document/DocumentStructureService';
+import { imageSize } from 'image-size';
 
 const mimeTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.avif': 'image/avif', '.svg': 'image/svg+xml' };
 const manifestName = '.markdown-editor-assets.json';
@@ -60,7 +61,21 @@ export class ImageAssetService {
   private importQueue: Promise<unknown> = Promise.resolve();
   private resources = new Map<string, string>();
   private resourceIds = new Map<string, string>();
-  private tickets = new Map<string, { path: string; expires: number }>();
+  private tickets = new Map<string, ({ path: string } | { bytes: Buffer; mime: string; name: string }) & { expires: number }>();
+  async readForCrop(documentPath: string | null, destination: string): Promise<string> {
+    const { bytes, mime } = await imageFile(resolveImagePath(documentPath, destination));
+    return `data:${mime};base64,${bytes.toString('base64')}`;
+  }
+  async importCroppedImage(documentPath: string, dataUrl: string): Promise<string> {
+    if (dataUrl.length > 24 * 1024 * 1024 || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl)) throw new Error('裁剪结果无效或过大。');
+    const bytes = Buffer.from(dataUrl.slice('data:image/png;base64,'.length), 'base64');
+    if (!bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) throw new Error('裁剪结果必须是 PNG 图片。');
+    const size = imageSize(bytes);
+    if (!size.width || !size.height || size.width * size.height > 32_000_000) throw new Error('裁剪图片尺寸过大。');
+    const id = randomUUID(); this.tickets.set(id, { bytes, mime: 'image/png', name: 'cropped.png', expires: Date.now() + 300000 });
+    try { return (await this.import(documentPath, [id]))[0].destination; }
+    finally { this.tickets.delete(id); }
+  }
   async stage(paths: string[]): Promise<string[]> {
     for (const [id, ticket] of this.tickets) if (ticket.expires < Date.now()) this.tickets.delete(id);
     const ids: string[] = [];
@@ -94,12 +109,13 @@ export class ImageAssetService {
       for (const id of ids) {
         const ticket = this.tickets.get(id); this.tickets.delete(id);
         if (!ticket || ticket.expires < Date.now()) throw new Error('拖入的图片已失效，请重新拖入。');
-        const { bytes, mime } = await imageFile(ticket.path), hash = digest(bytes);
-        const name = `${hash}${extname(ticket.path).toLowerCase()}`, path = join(folder, name);
+        const { bytes, mime } = 'path' in ticket ? await imageFile(ticket.path) : ticket, hash = digest(bytes);
+        const originalName = 'path' in ticket ? ticket.path : ticket.name;
+        const name = `${hash}${extname(originalName).toLowerCase()}`, path = join(folder, name);
         if (await stat(path).catch(() => null)) { if (digest(await readFile(path)) !== hash) throw new Error('附件存在同名文件，未覆盖原文件。'); }
         else { await writeFile(path, bytes, { flag: 'wx' }); created.push(path); }
         if (!manifest.files.some(file => file.name === name)) manifest.files.push({ name, sha256: hash, mime });
-        result.push({ destination: relative(dirname(documentPath), path).split(sep).join('/'), alt: basename(ticket.path, extname(ticket.path)) });
+        result.push({ destination: relative(dirname(documentPath), path).split(sep).join('/'), alt: basename(originalName, extname(originalName)) });
       }
       const manifestPath = join(folder, manifestName), old = await readFile(manifestPath).catch(() => null);
       if (old) restores.push(() => writeFile(manifestPath, old)); else created.push(manifestPath);

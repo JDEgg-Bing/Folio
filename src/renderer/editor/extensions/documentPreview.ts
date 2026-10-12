@@ -10,6 +10,7 @@ export interface PreviewEnvironment {
   features: DocumentFeatures;
   resolveImage(destination: string): Promise<{ url: string; mime: string }>;
   jump(position: number): void;
+  cropImage?(node: DocumentNode): void;
 }
 export const previewEnvironment = Facet.define<PreviewEnvironment, PreviewEnvironment>({ combine: values => values.at(-1) ?? { features: { ...DEFAULT_DOCUMENT_FEATURES }, resolveImage: async () => { throw new Error('图片服务不可用。'); }, jump: () => {} } });
 const mathCache = new Map<string, string | Error>();
@@ -49,6 +50,12 @@ function image(node: DocumentNode, environment: PreviewEnvironment, view: Editor
     img.addEventListener('load', () => { if (!disposed) view.requestMeasure(); });
     img.addEventListener('error', () => { if (!disposed) { placeholder.textContent = '图片无法显示。'; img.replaceWith(placeholder); view.requestMeasure(); } });
     placeholder.replaceWith(img); view.requestMeasure();
+    if (environment.cropImage) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'document-image-crop';
+      button.textContent = '裁剪'; button.setAttribute('aria-label', '裁剪图片'); button.title = '裁剪并保留原图';
+      button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); environment.cropImage!(node); });
+      figure.append(button); view.requestMeasure();
+    }
   }).catch(cause => { if (!disposed) { placeholder.textContent = cause instanceof Error && /^[\u4e00-\u9fff]/.test(cause.message) ? cause.message : '图片无法显示。'; view.requestMeasure(); } });
   if (label) { const caption = document.createElement(block ? 'figcaption' : 'span'); caption.className = 'document-caption'; caption.textContent = `${label}${node.text ? `　${node.text}` : ''}`; figure.append(caption); }
   return figure;
